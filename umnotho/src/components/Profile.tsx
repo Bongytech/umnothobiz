@@ -1,22 +1,24 @@
+// src/components/Profile.tsx
 import React from 'react';
-import { useAuth } from './Auth';
+import { useAuth } from './useAuth';
 
 const Profile: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
-    <div className="profile">
-      {currentUser ? (
-        <div>
-          <h2>Welcome, {currentUser.displayName || 'User'}!</h2>
-          <p>Email: {currentUser.email}</p>
-          <p>Reputation Score: {/* Fetch and display user's reputation */}</p>
-        </div>
+    <div style={{ padding: '20px' }}>
+      <h2>User Profile</h2>
+      {user ? (
+        <>
+          <p>Email: {user.email}</p>
+          <button onClick={logout}>Logout</button>
+        </>
       ) : (
-        <p>Please log in to view your profile.</p>
+        <p>No user information available.</p>
       )}
     </div>
   );
 };
 
 export default Profile;
+

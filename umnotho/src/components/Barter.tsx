@@ -3,148 +3,289 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-import { collection, addDoc, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+//import GooglePayButton from '@google-pay/button-react';
+//import { useAuth } from './useAuth';
+import './Barter.css';
+import logo from '../assets/Umnotho2.png';
 
 type Item = {
   id: string;
   name: string;
   description: string;
-  value: string;
+  estimatedValue: string;
   owner: string;
   city: string;
-};
-
-type UserProfile = {
-  displayName: string;
   reputation: number;
+  isBusinessBid: boolean;
+  type: 'goods' | 'service';
 };
 
+type ActiveBid = {
+  id: string;
+  itemId: string;
+  bidderId: string;
+  ownerId: string;
+  status: string;
+  messages: { senderId: string; content: string; timestamp: Date }[];
+  agreed: boolean;
+};
 const Barter: React.FC = () => {
+ // const { user, updateSubscription } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
-  const [newItem, setNewItem] = useState<{ name: string; description: string; value: string; city: string }>({
-    name: '',
-    description: '',
-    value: '',
-    city: '',
-  });
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [ownerProfile, setOwnerProfile] = useState<UserProfile | null>(null); // State to hold owner profile
+  const [newItem, setNewItem] = useState({ name: '', description: '', estimatedValue: '', city: '', isBusinessBid: false, type: 'goods' });
+  //const [ setSelectedItem] = useState<Item | null>(null);
+  const [filters, setFilters] = useState({ city: '', type: '', estimatedValue: '' });
   const navigate = useNavigate();
+  const [activeBid, setActiveBid] = useState<ActiveBid | null>(null);
+  const [message, setMessage] = useState('');
 
-  // Fetch items from Firestore on component mount
-  useEffect(() => {
-    const fetchItems = async () => {
+  // Fetch items from Firestore and categorize into Basic and Business Bids
+   useEffect(() => {
+  const fetchItems = async () => {
+    try {
       const itemsCollection = collection(db, 'barterItems');
       const itemSnapshot = await getDocs(itemsCollection);
-      const itemList = itemSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Item));
+      
+      const itemList =
+        itemSnapshot.docs.map(doc =>({id: doc.id, ...doc.data() } as Item));
+
       setItems(itemList);
-    };
-    fetchItems();
-  }, []);
-
-  // Fetch the owner's profile when an item is selected
-  const fetchOwnerProfile = async (ownerId: string) => {
-    const ownerRef = doc(db, 'users', ownerId);
-    const ownerSnap = await getDoc(ownerRef);
-    if (ownerSnap.exists()) {
-      const ownerData = ownerSnap.data() as UserProfile;
-      setOwnerProfile(ownerData);
-    } else {
-      setOwnerProfile(null);  // Reset if no owner found
-    }
+      console.log("Fetched items:", itemList);
+    } catch (err) {
+      console.error("Error fetching items:", err);
+    } 
   };
 
-  // Handle item selection to view details
-  const handleItemSelect = (item: Item) => {
-    setSelectedItem(item);
-    fetchOwnerProfile(item.owner);  // Fetch owner's profile data
-  };
+  fetchItems();
+}, []);
 
-  // Add new item to Firestore
-  const handleAddItem = async () => {
-    if (newItem.name && newItem.description && newItem.value && newItem.city) {
+  // Filter items based on user input
+  /*const filteredItems = items.filter((item) => {
+    const matchesCity = filters.city === '' || item.city.toLowerCase().includes(filters.city.toLowerCase());
+    const matchesType = filters.type === '' || item.type === filters.type;
+    const matchesEstimatedValue = filters.estimatedValue === '' || item.estimatedValue === filters.estimatedValue;
+    return matchesCity && matchesType && matchesEstimatedValue;
+  });
+ */
+
+
+const handleAddItem = async () => {
+  // Check if all required fields are filled
+  if (newItem.name && newItem.description && newItem.estimatedValue && newItem.city) {
+    try {
       const itemData = {
         ...newItem,
         owner: auth.currentUser?.uid || 'Unknown',
+        type: newItem.type as 'goods' | 'service', // Explicitly cast type
+        reputation: 5, // Initial reputation
       };
+      
+      // Add the item to Firestore and update local state
       const docRef = await addDoc(collection(db, 'barterItems'), itemData);
       setItems([...items, { id: docRef.id, ...itemData }]);
-      setNewItem({ name: '', description: '', value: '', city: '' });
-    } else {
-      alert("Please fill in all fields.");
+      
+      // Reset newItem to default values
+      setNewItem({
+        name: '',
+        description: '',
+        estimatedValue: '',
+        city: '',
+        isBusinessBid: false,
+        type: 'goods',
+      });
+    } catch (error) {
+      console.error("Error adding item:", error);
+      alert("Failed to add item. Please try again.");
+    }
+  } else {
+    alert("Please fill in all fields.");
+  }
+};
+
+
+  // Move item to 'activeBids' and remove from 'barterItems'
+    const handlePlaceBid = async (item: Item) => {
+    try {
+      const activeBidData = {
+        itemId: item.id,
+        bidderId: auth.currentUser?.uid || 'Unknown',
+        ownerId: item.owner,
+        status: 'Pending',
+        messages: [],
+        agreed: false,
+      };
+      const docRef = await addDoc(collection(db, 'activeBids'), activeBidData);
+      await deleteDoc(doc(db, 'barterItems', item.id));
+      setItems(items.filter((i) => i.id !== item.id));
+      alert(`Bid placed on item: ${item.name}. Coordination started.`);
+      setActiveBid({ id: docRef.id, ...activeBidData });
+    } catch (error) {
+      console.error("Error placing bid:", error);
+      alert("Failed to place bid. Please try again.");
+    }
+  };
+  // Handle payment success for upgrading subscription
+ /* const handlePaymentSuccess = async (subscriptionType: 'basic' | 'biz') => {
+    try {
+      await updateSubscription(subscriptionType);
+      alert(`Subscription upgraded to ${subscriptionType}`);
+    } catch (error) {
+      console.error("Error updating subscription:", error);
+    }
+  };*/
+
+ // Send a message within an active bid
+  const handleSendMessage = async () => {
+    if (!activeBid || !message.trim()) return;
+    const messageData = {
+      senderId: auth.currentUser?.uid || 'Unknown',
+      content: message,
+      timestamp: new Date(),
+    };
+    try {
+      const activeBidRef = doc(db, 'activeBids', activeBid.id);
+      await updateDoc(activeBidRef, { messages: arrayUnion(messageData) });
+      setActiveBid({
+        ...activeBid,
+        messages: [...activeBid.messages, messageData],
+      });
+      setMessage('');
+    } catch (error) {
+      console.error("Error sending message:", error);
     }
   };
 
-  const handleOfferClick = (item: Item) => {
-    alert(`Offer made on item: ${item.name}`);
-    // Add offer logic here, if needed
+ // Update bid status (for example, from "Pending" to "In Negotiation" or "Agreed")
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!activeBid) return;
+    try {
+      const activeBidRef = doc(db, 'activeBids', activeBid.id);
+      await updateDoc(activeBidRef, { status: newStatus, agreed: newStatus === 'Agreed' });
+      setActiveBid({ ...activeBid, status: newStatus, agreed: newStatus === 'Agreed' });
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
   };
+  //const handleLogin = () => navigate('/auth');
+  const handlePricing = () => navigate('/pricing');
+  //const handleSignUp = () => navigate('/signup');
+  const handleLogoClick = () => navigate('/'); // Navigate to landing page
 
+  // Logout user
   const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/auth");
+    try {
+      await signOut(auth);
+      navigate("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div className="barter-container">
+	  {/* Navbar */}
+      <nav className="navbar">
+        <div className="nav-logo" onClick={handleLogoClick}>
+          <img src={logo} alt="Umnotho Logo" style={{ cursor: 'pointer', height: '40px' }} />
+        </div>
+        <div className="nav-buttons">
+        <button className="nav-button" onClick={handlePricing}>Pricing</button>
+        <button onClick={handleLogout}>Logout</button>
+        </div>
+      </nav>
       <h2>Barter Page</h2>
-      <button onClick={handleLogout}>Logout</button>
       
+
       <h3>List a New Item</h3>
-      <input
-        type="text"
-        placeholder="Item Name"
-        value={newItem.name}
-        onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-      />
-      <input
-        type="text"
-        placeholder="Description"
-        value={newItem.description}
-        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-      />
-      <input
-        type="text"
-        placeholder="Value (e.g., $50)"
-        value={newItem.value}
-        onChange={(e) => setNewItem({ ...newItem, value: e.target.value })}
-      />
-      <input
-        type="text"
-        placeholder="City"
-        value={newItem.city}
-        onChange={(e) => setNewItem({ ...newItem, city: e.target.value })}
-      />
+      <input type="text" placeholder="Item Name" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
+      <input type="text" placeholder="Description" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} />
+      <input type="text" placeholder="Estimated Value (e.g., $50)" value={newItem.estimatedValue} onChange={(e) => setNewItem({ ...newItem, estimatedValue: e.target.value })} />
+      <input type="text" placeholder="City" value={newItem.city} onChange={(e) => setNewItem({ ...newItem, city: e.target.value })} />
+      <label>
+        <input
+          type="checkbox"
+          checked={newItem.isBusinessBid}
+          onChange={(e) => setNewItem({ ...newItem, isBusinessBid: e.target.checked })}
+        />
+        Business Bid
+      </label>
+      <label>
+        <select value={newItem.type} onChange={(e) => setNewItem({ ...newItem, type: e.target.value as 'goods' | 'service' })}>
+          <option value="goods">Goods</option>
+          <option value="service">Service</option>
+        </select>
+      </label>
       <button onClick={handleAddItem}>Add Item</button>
 
-      <h3>View Bids</h3>
+      {/* Search and Filter Section */}
+      <h3>Search & Filter</h3>
+      <input
+        type="text"
+        placeholder="Filter by City"
+        value={filters.city}
+        onChange={(e) => setFilters({ ...filters, city: e.target.value })}
+      />
+      <select
+        value={filters.type}
+        onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+      >
+        <option value="">All Types</option>
+        <option value="goods">Goods</option>
+        <option value="service">Service</option>
+      </select>
+      <input
+        type="text"
+        placeholder="Estimated Value"
+        value={filters.estimatedValue}
+        onChange={(e) => setFilters({ ...filters, estimatedValue: e.target.value })}
+      />
+
+            <h3>Basic Bids</h3>
       <ul>
-        {items.map((item) => (
+        {items.filter(item => !item.isBusinessBid).map((item) => (
           <li key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-            <div style={{ flex: 1 }} onClick={() => handleItemSelect(item)}>
-              <strong>{item.name}</strong> - {item.description} (Value: {item.value}, City: {item.city})
+            <div style={{ flex: 1 }}/* onClick={() => setSelectedItem(item)}*/>
+              <strong>{item.name}</strong> - {item.description} (Estimated Value: {item.estimatedValue}, City: {item.city}) | Reputation: {item.reputation}
             </div>
-            <button onClick={() => handleOfferClick(item)}>Offer</button>
+            <button onClick={() => handlePlaceBid(item)}>Place Bid</button>
           </li>
         ))}
       </ul>
 
-      {selectedItem && (
+      <h3>Business Bids</h3>
+      <ul>
+        {items.filter(item => item.isBusinessBid).map((item) => (
+          <li key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ flex: 1 }}/* onClick={() => setSelectedItem(item)}*/ >
+              <strong>{item.name}</strong> - {item.description} (Estimated Value: {item.estimatedValue}, City: {item.city}) | Reputation: {item.reputation}
+            </div>
+            <button onClick={() => handlePlaceBid(item)}>Place Bid</button>
+          </li>
+        ))}
+      </ul>
+
+      {/* Coordination Section */}
+      {activeBid && (
         <div style={{ marginTop: '20px', padding: '10px', border: '1px solid black' }}>
-          <h4>Item Details</h4>
-          <p><strong>Name:</strong> {selectedItem.name}</p>
-          <p><strong>Description:</strong> {selectedItem.description}</p>
-          <p><strong>Value:</strong> {selectedItem.value}</p>
-          <p><strong>City:</strong> {selectedItem.city}</p>
-          {ownerProfile ? (
-            <>
-              <p><strong>Owner:</strong> {ownerProfile.displayName}</p>
-              <p><strong>Reputation:</strong> {ownerProfile.reputation}</p>
-            </>
-          ) : (
-            <p>Loading owner details...</p>
-          )}
-          <button onClick={() => setSelectedItem(null)}>Close</button>
+          <h4>Coordination for Bid</h4>
+          <p><strong>Status:</strong> {activeBid.status}</p>
+          {activeBid.messages.map((msg, idx) => (
+            <div key={idx}>
+              <strong>{msg.senderId === auth.currentUser?.uid ? "You" : "Owner"}:</strong> {msg.content}
+            </div>
+          ))}
+          <input
+            type="text"
+            placeholder="Send a message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+          <button onClick={handleSendMessage}>Send Message</button>
+
+          <h4>Update Status</h4>
+          <button onClick={() => handleUpdateStatus('In Negotiation')}>In Negotiation</button>
+          <button onClick={() => handleUpdateStatus('Agreed')}>Agree</button>
         </div>
       )}
     </div>

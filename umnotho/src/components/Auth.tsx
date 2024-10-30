@@ -1,47 +1,51 @@
 // src/components/Auth.tsx
 import React, { useState } from 'react';
-import { auth, db } from '../firebaseConfig';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from './useAuth';
+import logo from '../assets/Umnotho2.png';
 import { useNavigate } from 'react-router-dom';
-import { doc, setDoc } from 'firebase/firestore';
 
 const Auth: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-
-  // Function to initialize user profile with default reputation
-  const initializeUserProfile = async (userId: string) => {
-    const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, {
-      reputation: 5,  // Default starting reputation
-      displayName: email.split('@')[0],  // Optional: use part of the email as display name
-    });
-  };
+  const { login, signUp } = useAuth();
 
   const handleAuth = async () => {
     try {
       if (isLogin) {
-        // Log in the user
-        await signInWithEmailAndPassword(auth, email, password);
+        await login(email, password);
       } else {
-        // Sign up the user and initialize profile in Firestore
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const userId = userCredential.user.uid;
-        await initializeUserProfile(userId);  // Set default reputation for new users
+        await signUp(email, password, username);
       }
-      // Navigate to barter page after successful login/signup
-      navigate("/barter");
     } catch (error) {
       console.error("Authentication error", error);
       alert("Authentication failed. Please try again.");
     }
   };
 
+const handlePricing = () => navigate('/pricing');
+const handleLogoClick = () => navigate('/');
+
   return (
-    <div style={{ padding: '20px' }}>
+   <div><nav className="navbar">
+        <div className="nav-logo" onClick={handleLogoClick}>
+          <img src={logo} alt="Umnotho Logo" style={{ cursor: 'pointer', height: '40px' }} />
+        </div>
+        <div className="nav-buttons">
+        <button className="nav-button" onClick={handlePricing}>Pricing</button>
+        </div>
+      </nav> <div style={{ padding: '20px', textAlign:'left' }}>
       <h2>{isLogin ? "Login" : "Sign Up"}</h2>
+      {!isLogin && (
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+      )}
       <input
         type="email"
         placeholder="Email"
@@ -60,7 +64,7 @@ const Auth: React.FC = () => {
       <p onClick={() => setIsLogin(!isLogin)}>
         {isLogin ? "Create an account" : "Already have an account? Login"}
       </p>
-    </div>
+    </div></div>
   );
 };
 

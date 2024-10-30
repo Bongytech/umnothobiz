@@ -1,27 +1,20 @@
 // src/App.tsx
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import LandingPage from './components/LandingPage';
 import Auth from './components/Auth';
-import Barter from './components/Barter';
-import { auth } from './firebaseConfig';
-import { onAuthStateChanged } from "firebase/auth";
+import Barter from './components/Barter'; // Import Barter component
+import Pricing from './components/Pricing';  // Placeholder for Pricing component
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setIsAuthenticated(!!user);
-    });
-    return () => unsubscribe();
-  }, []);
-
   return (
-    <Router> {/* Wrap the entire app in Router */}
+    <Router>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<Auth />} />
-        <Route path="/barter" element={isAuthenticated ? <Barter /> : <Navigate to="/auth" />} />
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/barter" : "/auth"} />} />
+        <Route path="/barter" element={<Barter />} /> {/* Add Barter route */}
+        <Route path="/pricing" element={<Pricing />} /> {/* Add Pricing route */}
+        {/* Add other routes as needed */}
       </Routes>
     </Router>
   );

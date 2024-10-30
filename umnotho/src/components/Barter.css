@@ -1,0 +1,122 @@
+/* src/components/Barter.css */
+
+/* General container */
+.barter-container {
+  padding: 10px;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: left;
+  color:  #ffd700;
+}
+
+/* Header */
+.barter-header {
+  text-align: left;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+	  color:  #ffd700;
+}
+
+/* Item List Styles */
+.item-list {
+  list-style-type: none;
+  padding: 0;
+color: #817b1c;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 10px;
+	color: #817b1c;
+}
+
+.item-name {
+  font-weight: bold;
+	color: #817b1c;
+}
+
+.item-details {
+  font-size: 0.9rem;
+  color: #817b1c;
+}
+
+/* Place Bid Button */
+.place-bid-button {
+  background-color: blue;
+  color:  #ffd700;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.place-bid-button.disabled {
+  background-color: grey;
+  cursor: not-allowed;
+color: #817b1c;
+}
+
+/* Coordination Section */
+.coordination-section {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+color: #817b1c;
+}
+
+.coordination-section h4 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.message {
+  margin-bottom: 10px;
+color: #817b1c;
+}
+
+.message strong {
+ color: #817b1c;
+}
+
+.message-input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  border: 1px solid #b99505;
+color: #817b1c;
+}
+
+.send-message-button {
+  margin-top: 10px;
+  padding: 5px 15px;
+  border: none;
+  background-color: #007bff;
+  color: #817b1c;
+  cursor: pointer;
+}
+
+.status-buttons button {
+  margin-right: 10px;
+  padding: 5px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+color: #817b1c;
+}
+
+.status-buttons .agree {
+  background-color: #28a745;
+  color: #817b1c;
+}
+
+.status-buttons .negotiate {
+  background-color: #ffc107;
+  color: #817b1c;
+}

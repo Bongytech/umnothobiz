@@ -32,7 +32,7 @@ const Pricing: React.FC = () => {
       description: "Access public bids, pay per transaction.",
       price: "Free",
       priceAmount: "0.00",
-      features: ["Access to public bids", "Pay-per-transaction"],
+      features: ["Access to public bids", " Pay-per-transaction"],
       buttonLabel: "Get Started",
       subscriptionType: 'none',
     },
@@ -43,7 +43,7 @@ const Pricing: React.FC = () => {
       priceAmount: "49.00",
       features: [
         "Unlimited transactions on individual bids",
-        "Business bids available with transaction fee",
+        " Business bids available with transaction fee",
       ],
       buttonLabel: "Subscribe",
       subscriptionType: 'basic',
@@ -55,7 +55,7 @@ const Pricing: React.FC = () => {
       priceAmount: "97.00",
       features: [
         "Unlimited transactions on individual and business bids",
-        "Priority support",
+        " Priority support",
       ],
       buttonLabel: "Upgrade",
       subscriptionType: 'biz',
@@ -85,46 +85,7 @@ const Pricing: React.FC = () => {
   
 
   }
-   /* const paymentDataRequest = {
-      apiVersion: 2,
-      apiVersionMinor: 0,
-      allowedPaymentMethods: [
-        {
-          type: 'CARD',
-          parameters: {
-            allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
-            allowedCardNetworks: ['MASTERCARD', 'VISA'],
-          },
-          tokenizationSpecification: {
-            type: 'PAYMENT_GATEWAY',
-            parameters: {
-              gateway: 'example',
-              gatewayMerchantId: 'exampleMerchantId',
-            },
-          },
-        },
-      ],
-      merchantInfo: {
-        merchantId: 'your-merchant-id',
-        merchantName: 'Example Merchant',
-      },
-      transactionInfo: {
-        totalPriceStatus: 'FINAL',
-        totalPriceLabel: 'Total',
-        totalPrice: priceAmount,
-        currencyCode: 'USD',
-        countryCode: 'US',
-      },
-    };
-
-    googlePayClient.loadPaymentData(paymentDataRequest).then(() => {
-      updateSubscription(subscriptionType);
-    }).catch((error: any) => {
-      console.error("Google Pay error:", error);
-      alert("Payment failed. Please try again.");
-    });
-  };*/
-
+   
 
   return (
    <div><nav className="navbar">
@@ -136,19 +97,16 @@ const Pricing: React.FC = () => {
         </div>
       </nav> <div style={styles.container}>
       <h1 style={styles.heading}>Our Pricing Plans</h1>
-      <div style={styles.plansContainer}>
-          
+      <div>       
       <div className="plans">
         {plans.map((plan, index) => (
           <div key={index} className="plan-card">
-            <h3>{plan.name}</h3>
-            <p className="plan-price">{plan.price}</p>
-            <p className="plan-description">{plan.description}</p>
-            <ul className="plan-features">
+            <h3>{plan.name}</h3>       
+            <p /*className="plan-features"*/>
               {plan.features.map((feature, idx) => (
-                <li key={idx}>{feature}</li>
+                <span key={idx}>{feature}</span>
               ))}
-            </ul>
+            </p><p className="plan-price">{plan.price}</p>
             {plan.subscriptionType === 'none' ? (
               <button
                 className="plan-button"
@@ -216,12 +174,12 @@ const styles = {
     textAlign: 'center' as 'center',
   },
   plansContainer: {
-    display: 'flex',
     flexDirection: 'row' as 'row',
     gap: '20px',
     justifyContent: 'center',
     marginTop: '20px',
     flexWrap: 'wrap' as 'wrap',
+textAlign: 'left',
 	
   },
   plan: {
@@ -231,13 +189,14 @@ const styles = {
     borderRadius: '8px',
     backgroundColor: '#1f1f1f',
     boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
-    textAlign: 'left' as 'center',
+    textAlign: 'left',
     marginBottom: '20px',
   },
   planTitle: {
     fontSize: '1.5rem',
     fontWeight: 'bold',
     marginBottom: '10px',
+textAlign: 'center',
   },
   price: {
     fontSize: '1.2rem',

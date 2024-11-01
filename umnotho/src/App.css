@@ -56,8 +56,13 @@
 body {
   margin: 0;
   overflow-x: hidden; /* Prevents grey space on the right */
+color:  #ffd700;
 }
-
+button{
+color:  #ffd700;
+}
+input{
+color:  #ffd700;}
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .landing-page {

@@ -1,0 +1,75 @@
+/* src/components/MyBids.css */
+
+.mybids-container {
+  padding: 20px;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /*padding: 5px 10px;*/
+  background-color: #2c2b2b;
+}
+
+.nav-logo img {
+  cursor: pointer;
+  height: 38px;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.nav-button {
+  background-color: #1d1e1d;
+  color: rgb(251, 203, 10);
+  border: none;
+  padding: 5px 5px;
+  cursor: pointer;
+}
+
+.filter-search {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.filter-search select,
+.filter-search input {
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.bid-card {
+  margin-top: 20px;
+  padding: 10px;
+  /*border: 1px solid #ddd;*/
+  border-radius: 6px;
+  background-color: #323131;
+}
+
+.bid-card h4 {
+  margin-bottom: 10px;
+}
+
+.bid-card p {
+  margin: 5px 0;
+}
+
+.bid-card input[type="text"] {
+  width: calc(100% - 100px);
+  padding: 5px;
+  margin-right: 5px;
+}
+
+.bid-card button {
+  margin-top: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+  border: none;
+  color: rgb(230, 202, 20);
+  background-color: #271e02;
+}

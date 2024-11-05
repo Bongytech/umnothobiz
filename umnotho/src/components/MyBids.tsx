@@ -1,156 +1,289 @@
 // src/components/MyBids.tsx
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
-import { collection, getDocs, doc, updateDoc, query, where, arrayUnion, orderBy } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { collection, getDocs, query, where, orderBy, updateDoc, doc, arrayUnion, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import logo from '../assets/Umnotho2.png';
 import './MyBids.css';
+import logo from '../assets/Umnotho2.png';
 
-type ActiveBid = {
+type Bid = {
   id: string;
   itemId: string;
+  bidderId: string;
+  ownerId: string;
+  status: string;
+  messages: { senderId: string; content: string; timestamp: Date }[];
+  agreed: boolean;
+  lastUpdated: Date;
   name: string;
   description: string;
   estimatedValue: string;
   city: string;
   type: 'goods' | 'service';
-  status: string;
-  messages: { senderId: string; content: string; timestamp: Date }[];
-  agreed: boolean;
-  lastUpdated: Date;
+  isBusinessBid: boolean;
+  reputation: number;
 };
 
 const MyBids: React.FC = () => {
-  const [activeBids, setActiveBids] = useState<ActiveBid[]>([]);
-  const [message, setMessage] = useState('');
-  const [filters, setFilters] = useState({ status: '', search: '' });
+  const [myBidItems, setMyBidItems] = useState<Bid[]>([]);
+  const [myPlacedBids, setMyPlacedBids] = useState<Bid[]>([]);
+  const [newMessages, setNewMessages] = useState<{ [key: string]: string }>({});
+  const [usernames, setUsernames] = useState<{ [key: string]: string }>({});
+  const [showRatingPopup, setShowRatingPopup] = useState<{ [key: string]: boolean }>({});
   const navigate = useNavigate();
- 
- 
 
   useEffect(() => {
-    const fetchActiveBids = async () => {
-      // Check if the user is authenticated
-      if (!auth.currentUser) {
-        console.error("User is not authenticated.");
-		
-        return;
-      }
+    const fetchBids = async () => {
+      if (!auth.currentUser) return;
 
       try {
         const activeBidsRef = collection(db, 'activeBids');
-        const activeBidsQuery = query(
+
+        // Fetch My Bid Items
+        const myBidItemsQuery = query(
           activeBidsRef,
-          where('bidderId', '==', auth.currentUser.uid),  // Check for authenticated user
+          where('ownerId', '==', auth.currentUser.uid),
           orderBy('lastUpdated', 'desc')
         );
-        const querySnapshot = await getDocs(activeBidsQuery);
-        const bids = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ActiveBid));
-        setActiveBids(bids);
+        const myBidItemsSnapshot = await getDocs(myBidItemsQuery);
+        const myBidItemsData = myBidItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Bid));
+
+        // Fetch My Placed Bids
+        const myPlacedBidsQuery = query(
+          activeBidsRef,
+          where('bidderId', '==', auth.currentUser.uid),
+          orderBy('lastUpdated', 'desc')
+        );
+        const myPlacedBidsSnapshot = await getDocs(myPlacedBidsQuery);
+        const myPlacedBidsData = myPlacedBidsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Bid));
+
+        setMyBidItems(myBidItemsData);
+        setMyPlacedBids(myPlacedBidsData);
+
+        const allMessages = [...myBidItemsData, ...myPlacedBidsData].flatMap(bid => bid.messages);
+        const uniqueSenderIds = Array.from(new Set(allMessages.map(msg => msg.senderId)));
+        await fetchUsernames(uniqueSenderIds);
       } catch (error) {
-        console.error("Error fetching active bids:", error);
+        console.error("Error fetching bids:", error);
       }
     };
 
-    fetchActiveBids();
-  }, [auth.currentUser]); // Dependency on auth.currentUser
+    fetchBids();
+  }, []);
 
-  const handleSendMessage = async (bidId: string) => {
-    if (!message.trim()) return;
-    const messageData = {
-      senderId: auth.currentUser?.uid || 'Unknown',
-      content: message,
-      timestamp: new Date(),
-    };
-    const bidRef = doc(db, 'activeBids', bidId);
-    await updateDoc(bidRef, {
-      messages: arrayUnion(messageData),
-      lastUpdated: messageData.timestamp,
-    });
-    setActiveBids(activeBids.map(bid => bid.id === bidId ? { ...bid, messages: [...bid.messages, messageData], lastUpdated: messageData.timestamp } : bid));
-    setMessage('');
-  };
-
-  const handleUpdateStatus = async (bidId: string, newStatus: string) => {
-    const bidRef = doc(db, 'activeBids', bidId);
-    const newTimestamp = new Date();
-    await updateDoc(bidRef, {
-      status: newStatus,
-      agreed: newStatus === 'Agreed',
-      lastUpdated: newTimestamp,
-    });
-    setActiveBids(activeBids.map(bid => bid.id === bidId ? { ...bid, status: newStatus, agreed: newStatus === 'Agreed', lastUpdated: newTimestamp } : bid));
+  const fetchUsernames = async (userIds: string[]) => {
+    const newUsernames = { ...usernames };
+    for (const userId of userIds) {
+      if (!newUsernames[userId]) {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        newUsernames[userId] = userDoc.exists() ? userDoc.data().displayName || "Unknown User" : "Unknown User";
+      }
+    }
+    setUsernames(newUsernames);
   };
 
   const handleLogout = async () => {
+    await auth.signOut();
+    navigate("/auth");
+  };
+
+  const handleLogoClick = () => navigate('/');
+
+  const handleSendMessage = async (bidId: string) => {
+    const messageContent = newMessages[bidId];
+    if (!messageContent) return;
+
+    const messageData = {
+      senderId: auth.currentUser?.uid || 'Unknown',
+      content: messageContent,
+      timestamp: new Date(),
+    };
+
     try {
-      await signOut(auth);
-      navigate("/auth");
+      const bidRef = doc(db, 'activeBids', bidId);
+      await updateDoc(bidRef, { messages: arrayUnion(messageData) });
+
+      setNewMessages((prev) => ({ ...prev, [bidId]: '' }));
+      setMyBidItems((prevBids) =>
+        prevBids.map((bid) =>
+          bid.id === bidId ? { ...bid, messages: [...bid.messages, messageData] } : bid
+        )
+      );
+      setMyPlacedBids((prevBids) =>
+        prevBids.map((bid) =>
+          bid.id === bidId ? { ...bid, messages: [...bid.messages, messageData] } : bid
+        )
+      );
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Error sending message:", error);
     }
   };
- 
 
-  const filteredBids = activeBids.filter(bid => 
-    (filters.status ? bid.status === filters.status : true) &&
-    (filters.search ? bid.name.toLowerCase().includes(filters.search.toLowerCase()) || bid.city.toLowerCase().includes(filters.search.toLowerCase()) : true)
-  );
+  // Update bid status
+  const handleUpdateStatus = async (bidId: string, newStatus: string, otherUserId?: string) => {
+  try {
+	if (newStatus === 'Complete' && otherUserId) {
+      // Log or process `otherUserId` as needed
+      console.log(`Completing bid with user ID: #######`);
+    }
+    const bidRef = doc(db, 'activeBids', bidId);
+    await updateDoc(bidRef, { status: newStatus });
+
+    setMyBidItems((prevBids) =>
+      prevBids.map((bid) =>
+        bid.id === bidId ? { ...bid, status: newStatus } : bid
+      )
+    );
+    setMyPlacedBids((prevBids) =>
+      prevBids.map((bid) =>
+        bid.id === bidId ? { ...bid, status: newStatus } : bid
+      )
+    );
+
+    if (newStatus === 'Complete') {
+      setShowRatingPopup((prev) => ({ ...prev, [bidId]: true }));
+    }
+  } catch (error) {
+    console.error("Error updating bid status:", error);
+  }
+};
+
+
+  // Handle rating for other user
+  const handleRateUser = async (otherUserId: string, rating: 'up' | 'down', bidId: string) => {
+  try {
+    const userRef = doc(db, 'users', otherUserId);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      const currentReputation = userDoc.data().reputation || 0;
+      const newReputation = rating === 'up' ? currentReputation + 1 : currentReputation - 1;
+      await updateDoc(userRef, { reputation: newReputation });
+    }
+    setShowRatingPopup((prev) => ({ ...prev, [bidId]: false }));  // Hide rating popup after rating
+  } catch (error) {
+    console.error("Error rating user:", error);
+  }
+};
+
+
+  const handleMessageChange = (bidId: string, content: string) => {
+    setNewMessages((prev) => ({ ...prev, [bidId]: content }));
+  };
 
   return (
-    <div className="mybids-container">
+    <div className="my-bids-container">
       {/* Navbar */}
       <nav className="navbar">
-        <div className="nav-logo" onClick={() => navigate('/')}>
+        <div className="nav-logo" onClick={handleLogoClick}>
           <img src={logo} alt="Umnotho Logo" style={{ cursor: 'pointer', height: '40px' }} />
         </div>
         <div className="nav-buttons">
-          <button className="nav-button" onClick={() => navigate('/barter')}>Barter</button>
+          <button onClick={() => navigate('/barter')}>Barter</button>
           <button onClick={handleLogout}>Logout</button>
         </div>
       </nav>
 
       <h2>My Bids</h2>
 
-      {/* Filter and Search Section */}
-      <div className="filter-search">
-        <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-          <option value="">All Statuses</option>
-          <option value="Pending">Pending</option>
-          <option value="In Negotiation">In Negotiation</option>
-          <option value="Agreed">Agreed</option>
-        </select>
-        <input
-          type="text"
-          placeholder="Search by name or city"
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-        />
-      </div>
+      {/* My Bid Items */}
+      <h3>My Bid Items</h3>
+      {myBidItems.length > 0 ? (
+        <div className="bid-card">
+          {myBidItems.map((bid) => (
+            <div key={bid.id} className="bid-item">
+              <div>
+                <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
+              </div>
+              <p>Status: {bid.status}</p>
+              <p>Reputation: {bid.reputation}</p>
 
-      {/* Display Bids */}
-      {filteredBids.map((bid) => (
-        <div key={bid.id} className="bid-card">
-          <h4>Bid on Item: {bid.name}</h4>
-          <p><strong>Description:</strong> {bid.description}</p>
-          <p><strong>Estimated Value:</strong> {bid.estimatedValue}</p>
-          <p><strong>City:</strong> {bid.city}</p>
-          <p><strong>Type:</strong> {bid.type}</p>
-          <p><strong>Status:</strong> {bid.status}</p>
-          {bid.messages.map((msg, idx) => (
-            <div key={idx}>
-              <strong>{msg.senderId === auth.currentUser?.uid ? "You" : "Owner"}:</strong> {msg.content}
+              <h4>Messages</h4>
+              <div className="messages">
+                {bid.messages.map((msg, index) => (
+                  <p key={index}>
+                    <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
+                  </p>
+                ))}
+              </div>
+
+              <input
+                type="text"
+                placeholder="Send a message"
+                value={newMessages[bid.id] || ''}
+                onChange={(e) => handleMessageChange(bid.id, e.target.value)}
+              />
+              <button onClick={() => handleSendMessage(bid.id)}>Send</button>
+
+              <h4>Update Status</h4>
+              {bid.status !== 'Complete' && (
+                <>
+                  <button onClick={() => handleUpdateStatus(bid.id, 'In Negotiation', bid.ownerId)}>In Negotiation</button>
+                  <button onClick={() => handleUpdateStatus(bid.id, 'Complete', bid.ownerId)}>Complete</button>
+                </>
+              )}
+              {showRatingPopup[bid.id] && (
+                <div className="rating-popup">
+                  <p>Rate the other user:</p>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍 Upvote</button>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎 Downvote</button>
+                </div>
+              )}
             </div>
           ))}
-          <input type="text" placeholder="Send a message" value={message} onChange={(e) => setMessage(e.target.value)} />
-          <button onClick={() => handleSendMessage(bid.id)}>Send Message</button>
-
-          <h4>Update Status</h4>
-          <button onClick={() => handleUpdateStatus(bid.id, 'In Negotiation')}>In Negotiation</button>
-          <button onClick={() => handleUpdateStatus(bid.id, 'Agreed')}>Agree</button>
         </div>
-      ))}
+      ) : (
+        <p>No bid items available.</p>
+      )}
+
+      {/* My Placed Bids */}
+      <h3>My Placed Bids</h3>
+      {myPlacedBids.length > 0 ? (
+        <div className="bid-card">
+          {myPlacedBids.map((bid) => (
+            <div key={bid.id} className="bid-item">
+              <div>
+                <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
+              </div>
+              <p>Status: {bid.status}</p>
+              <p>Reputation: {bid.reputation}</p>
+
+              <h4>Messages</h4>
+              <div className="messages">
+                {bid.messages.map((msg, index) => (
+                  <p key={index}>
+                    <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
+                  </p>
+                ))}
+              </div>
+
+              <input
+                type="text"
+                placeholder="Send a message"
+                value={newMessages[bid.id] || ''}
+                onChange={(e) => handleMessageChange(bid.id, e.target.value)}
+              />
+              <button onClick={() => handleSendMessage(bid.id)}>Send</button>
+
+              <h4>Update Status</h4>
+              
+                <>
+                  <button onClick={() => handleUpdateStatus(bid.id, 'In Negotiation', bid.ownerId)}>In Negotiation</button>
+                  <button onClick={() => handleUpdateStatus(bid.id, 'Complete', bid.ownerId)}>Complete</button>
+                </>
+              
+              {showRatingPopup[bid.id] && (
+                <div className="rating-popup">
+                  <p>Rate the other user:</p>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍 Upvote</button>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎 Downvote</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p>No placed bids available.</p>
+      )}
     </div>
   );
 };

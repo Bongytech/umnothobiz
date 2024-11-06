@@ -3,8 +3,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Auth from './components/Auth';
-import Barter from './components/Barter'; // Import Barter component
-import Pricing from './components/Pricing';  // Placeholder for Pricing component
+import Barter from './components/Barter'; 
+import Pricing from './components/Pricing'; 
 import MyBids from './components/MyBids';
 
 const App: React.FC = () => {

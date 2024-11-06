@@ -10,7 +10,7 @@ const Auth: React.FC = () => {
   const [username, setUsername] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-  const { login, signUp } = useAuth();
+  const { login, signUp, signInWithGoogle } = useAuth();
 
   const handleAuth = async () => {
     try {
@@ -25,46 +25,52 @@ const Auth: React.FC = () => {
     }
   };
 
-const handlePricing = () => navigate('/pricing');
-const handleLogoClick = () => navigate('/');
+  const handlePricing = () => navigate('/pricing');
+  const handleLogoClick = () => navigate('/');
 
   return (
-   <div><nav className="navbar">
+    <div>
+      <nav className="navbar">
         <div className="nav-logo" onClick={handleLogoClick}>
           <img src={logo} alt="Umnotho Logo" style={{ cursor: 'pointer', height: '40px' }} />
         </div>
         <div className="nav-buttons">
-        <button className="nav-button" onClick={handlePricing}>Pricing</button>
+          <button className="nav-button" onClick={handlePricing}>Pricing</button>
         </div>
-      </nav> <div style={{ padding: '20px', textAlign:'left' }}>
-      <h2>{isLogin ? "Login" : "Sign Up"}</h2>
-      {!isLogin && (
+      </nav>
+      <div style={{ padding: '20px', textAlign: 'left' }}>
+        <h2>{isLogin ? "Login" : "Sign Up"}</h2>
+        {!isLogin && (
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        )}
         <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
-      )}
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <button onClick={handleAuth}>
-        {isLogin ? "Login" : "Sign Up"}
-      </button>
-      <p onClick={() => setIsLogin(!isLogin)}>
-        {isLogin ? "Create an account" : "Already have an account? Login"}
-      </p>
-    </div></div>
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button onClick={handleAuth}>
+          {isLogin ? "Login" : "Sign Up"}
+        </button>
+        <button onClick={signInWithGoogle} style={{ marginTop: '10px', background: '#1f1f1g', color: '#ffd700', border: 'none' }}>
+          Sign in with Google
+        </button>
+        <p onClick={() => setIsLogin(!isLogin)}>
+          {isLogin ? "Create an account" : "Already have an account? Login"}
+        </p>
+      </div>
+    </div>
   );
 };
 

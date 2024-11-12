@@ -1,7 +1,7 @@
 // src/components/MyBids.tsx
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
-import { collection, getDocs, query, where, orderBy, updateDoc, doc, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, updateDoc, doc, arrayUnion, getDoc, addDoc, deleteDoc, runTransaction} from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import './MyBids.css';
 import logo from '../assets/Umnotho2.png';
@@ -29,7 +29,8 @@ const MyBids: React.FC = () => {
   const [myPlacedBids, setMyPlacedBids] = useState<Bid[]>([]);
   const [newMessages, setNewMessages] = useState<{ [key: string]: string }>({});
   const [usernames, setUsernames] = useState<{ [key: string]: string }>({});
-  const [showRatingPopup, setShowRatingPopup] = useState<{ [key: string]: boolean }>({});
+  const [showRatingPopup] = useState<{ [key: string]: boolean }>({});
+  const [showCompleted, setShowCompleted] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,7 +40,6 @@ const MyBids: React.FC = () => {
       try {
         const activeBidsRef = collection(db, 'activeBids');
 
-        // Fetch My Bid Items
         const myBidItemsQuery = query(
           activeBidsRef,
           where('ownerId', '==', auth.currentUser.uid),
@@ -48,7 +48,6 @@ const MyBids: React.FC = () => {
         const myBidItemsSnapshot = await getDocs(myBidItemsQuery);
         const myBidItemsData = myBidItemsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Bid));
 
-        // Fetch My Placed Bids
         const myPlacedBidsQuery = query(
           activeBidsRef,
           where('bidderId', '==', auth.currentUser.uid),
@@ -119,12 +118,11 @@ const MyBids: React.FC = () => {
     }
   };
 
-  // Update bid status
-  const handleUpdateStatus = async (bidId: string, newStatus: string, otherUserId?: string) => {
+const handleUpdateStatus = async (bidId: string, newStatus: string, otherUserId?: string) => {
   try {
 	if (newStatus === 'Complete' && otherUserId) {
       // Log or process `otherUserId` as needed
-      console.log(`Completing bid with user ID: #######`);
+      console.log(`Completing bid with user ID: #####`);
     }
     const bidRef = doc(db, 'activeBids', bidId);
     await updateDoc(bidRef, { status: newStatus });
@@ -140,39 +138,97 @@ const MyBids: React.FC = () => {
       )
     );
 
-    if (newStatus === 'Complete') {
-      setShowRatingPopup((prev) => ({ ...prev, [bidId]: true }));
-    }
   } catch (error) {
     console.error("Error updating bid status:", error);
   }
 };
+ 
+const handleReturnToBarter = async (bidId: string) => {
+  console.log("Attempting to return bid to barter items, bidId:", bidId);
+
+  let bidData = null; // Initialize bidData outside to avoid undefined reference errors
+
+  try {
+    // Retrieve bid data before updating the UI
+    const bidRef = doc(db, 'activeBids', bidId);
+    const bidSnapshot = await getDoc(bidRef);
+
+    if (!bidSnapshot.exists()) {
+      console.error("Bid data not found for bidId:", bidId);
+      return;
+    }
+
+    // Assign bid data for use within this function scope
+    bidData = bidSnapshot.data();
+
+    // Optimistically update UI by removing bid from my bids
+    setMyBidItems((prevItems) => prevItems.filter((item) => item.id !== bidId));
+
+    const barterRef = collection(db, 'barterItems');
+
+    // Use Firestore transaction for atomic operations
+    await runTransaction(db, async (transaction) => {
+      const bidDoc = await transaction.get(bidRef);
+      if (!bidDoc.exists()) {
+        throw new Error("Bid no longer exists in activeBids.");
+      }
+
+      // Move bid to barterItems collection
+      transaction.set(doc(barterRef, bidId), bidData);
+      transaction.delete(bidRef); // Remove from activeBids
+    });
+
+    alert("Item successfully returned to Barter Items.");
+  } catch (error) {
+    console.error("Error moving bid back to barter items:", error);
+
+    // Roll back UI update if transaction fails
+    if (bidData) {
+      setMyBidItems((prevItems) => [...prevItems, { id: bidId, ...bidData }]);
+    }
+  }
+};
 
 
-  // Handle rating for other user
-  const handleRateUser = async (otherUserId: string, rating: 'up' | 'down', bidId: string) => {
+
+
+
+const handleRateUser = async (otherUserId: string, rating: 'up' | 'down', bidId: string) => {
   try {
     const userRef = doc(db, 'users', otherUserId);
     const userDoc = await getDoc(userRef);
     if (userDoc.exists()) {
       const currentReputation = userDoc.data().reputation || 0;
+	  console.log(currentReputation);
       const newReputation = rating === 'up' ? currentReputation + 1 : currentReputation - 1;
       await updateDoc(userRef, { reputation: newReputation });
+	  console.log(newReputation, bidId);
     }
-    setShowRatingPopup((prev) => ({ ...prev, [bidId]: false }));  // Hide rating popup after rating
+    
   } catch (error) {
     console.error("Error rating user:", error);
   }
 };
 
-
-  const handleMessageChange = (bidId: string, content: string) => {
-    setNewMessages((prev) => ({ ...prev, [bidId]: content }));
+ // Handle bid cancellation
+  const handleCancelBid = async (bidId: string) => {
+    try {
+      await deleteDoc(doc(db, 'activeBids', bidId)); // Delete bid from Firestore
+      setMyPlacedBids((prevBids) => prevBids.filter(bid => bid.id !== bidId)); // Update state to remove canceled bid
+      alert("Bid canceled successfully.");
+    } catch (error) {
+      console.error("Error canceling bid:", error);
+      alert("Failed to cancel bid. Please try again.");
+    }
   };
+
+  const activeBidItems = myBidItems.filter(bid => bid.status !== 'Complete');
+  const activePlacedBids = myPlacedBids.filter(bid => bid.status !== 'Complete');
+  const completedBidItems = myBidItems.filter(bid => bid.status === 'Complete');
+  const completedPlacedBids = myPlacedBids.filter(bid => bid.status === 'Complete');
 
   return (
     <div className="my-bids-container">
-      {/* Navbar */}
       <nav className="navbar">
         <div className="nav-logo" onClick={handleLogoClick}>
           <img src={logo} alt="Umnotho Logo" style={{ cursor: 'pointer', height: '40px' }} />
@@ -185,104 +241,143 @@ const MyBids: React.FC = () => {
 
       <h2>My Bids</h2>
 
-      {/* My Bid Items */}
-      <h3>My Bid Items</h3>
-      {myBidItems.length > 0 ? (
-        <div className="bid-card">
-          {myBidItems.map((bid) => (
-            <div key={bid.id} className="bid-item">
-              <div>
-                <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
-              </div>
-              <p>Status: {bid.status}</p>
-              <p>Reputation: {bid.reputation}</p>
-
-              <h4>Messages</h4>
-              <div className="messages">
-                {bid.messages.map((msg, index) => (
-                  <p key={index}>
-                    <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
-                  </p>
-                ))}
-              </div>
-
-              <input
-                type="text"
-                placeholder="Send a message"
-                value={newMessages[bid.id] || ''}
-                onChange={(e) => handleMessageChange(bid.id, e.target.value)}
-              />
-              <button onClick={() => handleSendMessage(bid.id)}>Send</button>
-
-              <h4>Update Status</h4>
-              {bid.status !== 'Complete' && (
+      {/* Active Bids */}
+      <h3>My Active Bid Items</h3>
+      {activeBidItems.length > 0 ? (
+        activeBidItems.map((bid) => (
+          <div key={bid.id} className="bid-item">
+            <div>
+              <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
+            </div>
+            <p>Status: {bid.status}</p>
+            <h4>Messages</h4>
+            <div className="messages">
+              {bid.messages.map((msg, index) => (
+                <p key={index}>
+                  <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
+                </p>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Send a message"
+              value={newMessages[bid.id] || ''}
+              onChange={(e) => setNewMessages((prev) => ({ ...prev, [bid.id]: e.target.value }))}
+            />
+            <button onClick={() => handleSendMessage(bid.id)}>Send</button>
+			<button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍🏿 Upvote</button>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎🏿 Downvote</button>
+            <h4>Update Status</h4>
+              
                 <>
                   <button onClick={() => handleUpdateStatus(bid.id, 'In Negotiation', bid.ownerId)}>In Negotiation</button>
                   <button onClick={() => handleUpdateStatus(bid.id, 'Complete', bid.ownerId)}>Complete</button>
+                  <button onClick={() => handleReturnToBarter(bid.id, bid)}>Return to Barter</button>
                 </>
-              )}
+              
               {showRatingPopup[bid.id] && (
                 <div className="rating-popup">
                   <p>Rate the other user:</p>
-                  <button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍 Upvote</button>
-                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎 Downvote</button>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍🏿 Upvote</button>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎🏿 Downvote</button>
                 </div>
               )}
-            </div>
-          ))}
-        </div>
+          </div>
+        ))
       ) : (
-        <p>No bid items available.</p>
+        <p>No active bid items available.</p>
       )}
 
-      {/* My Placed Bids */}
-      <h3>My Placed Bids</h3>
-      {myPlacedBids.length > 0 ? (
-        <div className="bid-card">
-          {myPlacedBids.map((bid) => (
-            <div key={bid.id} className="bid-item">
-              <div>
-                <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
-              </div>
-              <p>Status: {bid.status}</p>
-              <p>Reputation: {bid.reputation}</p>
-
-              <h4>Messages</h4>
-              <div className="messages">
-                {bid.messages.map((msg, index) => (
-                  <p key={index}>
-                    <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
-                  </p>
-                ))}
-              </div>
-
-              <input
-                type="text"
-                placeholder="Send a message"
-                value={newMessages[bid.id] || ''}
-                onChange={(e) => handleMessageChange(bid.id, e.target.value)}
-              />
-              <button onClick={() => handleSendMessage(bid.id)}>Send</button>
-
-              <h4>Update Status</h4>
+      <h3>My Placed Active Bids</h3>
+      {activePlacedBids.length > 0 ? (
+        activePlacedBids.map((bid) => (
+          <div key={bid.id} className="bid-item">
+            <div>
+              <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
+            </div>
+            <p>Status: {bid.status}</p>
+            <h4>Messages</h4>
+            <div className="messages">
+              {bid.messages.map((msg, index) => (
+                <p key={index}>
+                  <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
+                </p>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Send a message"
+              value={newMessages[bid.id] || ''}
+              onChange={(e) => setNewMessages((prev) => ({ ...prev, [bid.id]: e.target.value }))}
+            />
+            <button onClick={() => handleSendMessage(bid.id)}>Send</button>
+             <button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍🏿</button>
+                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎🏿</button>
+            <h4>Update Status</h4>
               
                 <>
                   <button onClick={() => handleUpdateStatus(bid.id, 'In Negotiation', bid.ownerId)}>In Negotiation</button>
                   <button onClick={() => handleUpdateStatus(bid.id, 'Complete', bid.ownerId)}>Complete</button>
+                  <button onClick={() => handleCancelBid(bid.id)}>Cancel Bid</button>
                 </>
               
-              {showRatingPopup[bid.id] && (
-                <div className="rating-popup">
-                  <p>Rate the other user:</p>
-                  <button onClick={() => handleRateUser(bid.ownerId, 'up', bid.id)}>👍 Upvote</button>
-                  <button onClick={() => handleRateUser(bid.ownerId, 'down', bid.id)}>👎 Downvote</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+              
+          </div>
+        ))
       ) : (
-        <p>No placed bids available.</p>
+        <p>No active placed bids available.</p>
+      )}
+
+      <button onClick={() => setShowCompleted(!showCompleted)}>
+        {showCompleted ? "Hide Completed Bids" : "Show Completed Bids"}
+      </button>
+
+      {showCompleted && (
+        <>
+          <h3>Completed Bid Items</h3>
+          {completedBidItems.length > 0 ? (
+            completedBidItems.map((bid) => (
+              <div key={bid.id} className="bid-item">
+                <div>
+                  <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
+                </div>
+                <p>Status: {bid.status}</p>
+                <h4>Messages</h4>
+                <div className="messages">
+                  {bid.messages.map((msg, index) => (
+                    <p key={index}>
+                      <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>No completed bid items available.</p>
+          )}
+
+          <h3>Completed Placed Bids</h3>
+          {completedPlacedBids.length > 0 ? (
+            completedPlacedBids.map((bid) => (
+              <div key={bid.id} className="bid-item">
+                <div>
+                  <strong>{bid.name}</strong> - {bid.description} (Estimated Value: {bid.estimatedValue}, City: {bid.city})
+                </div>
+                <p>Status: {bid.status}</p>
+                <h4>Messages</h4>
+                <div className="messages">
+                  {bid.messages.map((msg, index) => (
+                    <p key={index}>
+                      <strong>{usernames[msg.senderId] || "Unknown User"}:</strong> {msg.content}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>No completed placed bids available.</p>
+          )}
+        </>
       )}
     </div>
   );

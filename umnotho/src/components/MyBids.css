@@ -73,3 +73,9 @@
   color: rgb(230, 202, 20);
   background-color: #271e02;
 }
+.bid-item{
+  margin-top: 10px;
+padding: 5px;
+  border: 1px solid #614a03;
+  border-radius: 4px;
+}

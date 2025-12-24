@@ -1,7 +1,7 @@
 // src/components/MyBids.tsx
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
-import { collection, getDocs, query, where, orderBy, updateDoc, doc, arrayUnion, getDoc, addDoc, deleteDoc, runTransaction} from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, updateDoc, doc, arrayUnion, getDoc, deleteDoc, runTransaction} from 'firebase/firestore'; // Removed addDoc
 import { useNavigate } from 'react-router-dom';
 import './MyBids.css';
 import logo from '../assets/Umnotho2.png';
@@ -121,8 +121,7 @@ const MyBids: React.FC = () => {
 const handleUpdateStatus = async (bidId: string, newStatus: string, otherUserId?: string) => {
   try {
 	if (newStatus === 'Complete' && otherUserId) {
-      // Log or process `otherUserId` as needed
-      console.log(`Completing bid with user ID: #####`);
+      console.log(`Completing bid with user ID: ${otherUserId}`);
     }
     const bidRef = doc(db, 'activeBids', bidId);
     await updateDoc(bidRef, { status: newStatus });
@@ -146,10 +145,14 @@ const handleUpdateStatus = async (bidId: string, newStatus: string, otherUserId?
 const handleReturnToBarter = async (bidId: string) => {
   console.log("Attempting to return bid to barter items, bidId:", bidId);
 
-  let bidData = null; // Initialize bidData outside to avoid undefined reference errors
+  // Define a type for the bid data
+  type BidDataType = {
+    [key: string]: any;
+  };
+
+  let bidData: BidDataType | null = null; // Initialize with proper type
 
   try {
-    // Retrieve bid data before updating the UI
     const bidRef = doc(db, 'activeBids', bidId);
     const bidSnapshot = await getDoc(bidRef);
 
@@ -158,40 +161,33 @@ const handleReturnToBarter = async (bidId: string) => {
       return;
     }
 
-    // Assign bid data for use within this function scope
-    bidData = bidSnapshot.data();
+    bidData = bidSnapshot.data() as BidDataType;
 
-    // Optimistically update UI by removing bid from my bids
     setMyBidItems((prevItems) => prevItems.filter((item) => item.id !== bidId));
 
     const barterRef = collection(db, 'barterItems');
 
-    // Use Firestore transaction for atomic operations
     await runTransaction(db, async (transaction) => {
       const bidDoc = await transaction.get(bidRef);
       if (!bidDoc.exists()) {
         throw new Error("Bid no longer exists in activeBids.");
       }
 
-      // Move bid to barterItems collection
-      transaction.set(doc(barterRef, bidId), bidData);
-      transaction.delete(bidRef); // Remove from activeBids
+      if (bidData) {
+        transaction.set(doc(barterRef, bidId), bidData);
+      }
+      transaction.delete(bidRef);
     });
 
     alert("Item successfully returned to Barter Items.");
   } catch (error) {
     console.error("Error moving bid back to barter items:", error);
 
-    // Roll back UI update if transaction fails
     if (bidData) {
-      setMyBidItems((prevItems) => [...prevItems, { id: bidId, ...bidData }]);
+      setMyBidItems((prevItems) => [...prevItems, { id: bidId, ...bidData } as Bid]);
     }
   }
 };
-
-
-
-
 
 const handleRateUser = async (otherUserId: string, rating: 'up' | 'down', bidId: string) => {
   try {
@@ -213,8 +209,8 @@ const handleRateUser = async (otherUserId: string, rating: 'up' | 'down', bidId:
  // Handle bid cancellation
   const handleCancelBid = async (bidId: string) => {
     try {
-      await deleteDoc(doc(db, 'activeBids', bidId)); // Delete bid from Firestore
-      setMyPlacedBids((prevBids) => prevBids.filter(bid => bid.id !== bidId)); // Update state to remove canceled bid
+      await deleteDoc(doc(db, 'activeBids', bidId));
+      setMyPlacedBids((prevBids) => prevBids.filter(bid => bid.id !== bidId));
       alert("Bid canceled successfully.");
     } catch (error) {
       console.error("Error canceling bid:", error);
@@ -272,7 +268,7 @@ const handleRateUser = async (otherUserId: string, rating: 'up' | 'down', bidId:
                 <>
                   <button onClick={() => handleUpdateStatus(bid.id, 'In Negotiation', bid.ownerId)}>In Negotiation</button>
                   <button onClick={() => handleUpdateStatus(bid.id, 'Complete', bid.ownerId)}>Complete</button>
-                  <button onClick={() => handleReturnToBarter(bid.id, bid)}>Return to Barter</button>
+                  <button onClick={() => handleReturnToBarter(bid.id)}>Return to Barter</button> {/* Fixed: removed second parameter */}
                 </>
               
               {showRatingPopup[bid.id] && (

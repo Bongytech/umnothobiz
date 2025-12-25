@@ -1,0 +1,47 @@
+name: 🔐 Dependency Approval
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'functions/package.json'
+      - 'functions/package-lock.json'
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for new dependencies
+        id: new-deps
+        run: |
+          # Compare with base branch
+          echo "Checking for new dependencies..."
+          # Add your logic here
+          echo "::set-output name=has_new_deps::true"
+          
+      - name: Require Approval for New Dependencies
+        if: steps.new-deps.outputs.has_new_deps == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['needs-security-review']
+            })
+            
+            github.rest.pulls.createReview({
+              pull_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event: 'REQUEST_CHANGES',
+              body: '🔒 **Security Review Required**\n\nNew dependencies detected. Please get approval from @security-team before merging.'
+            })

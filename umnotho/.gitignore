@@ -22,3 +22,94 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# ==================== SECRETS ==================== #
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+.env.staging
+
+# Firebase secrets
+service-account*.json
+firebase-admin*.json
+*.key.json
+*-credentials.json
+
+# API keys & tokens
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cert
+
+# Configuration with secrets
+config.json
+credentials.json
+secrets.json
+
+# IDE/Editor files that might contain secrets
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Build directories
+dist/
+build/
+.out/
+.next/
+# Add to your .gitignore file
+cat >> .gitignore << 'EOF'
+
+# ==================== SECURITY & SECRETS ==================== #
+# Environment files (don't commit these!)
+.env.local
+.env.development
+.env.production
+.env.test
+.env.staging
+*.env
+
+# Secret/credential files
+service-account*.json
+firebase-admin*.json
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# Security scan reports (temporary)
+secrets-report*.json
+gitleaks-report*.sarif
+trufflehog*.json
+security-scan-*.log
+
+# IDE/Editor files that might contain secrets
+.vscode/settings.json
+.vscode/launch.json
+.idea/workspace.xml
+
+# Firebase debug/log files
+.firebase/
+firebase-debug.log
+EOF.env.local
+.env.production
+*.env

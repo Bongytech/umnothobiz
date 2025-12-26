@@ -1,0 +1,1 @@
+Testing .gitleaks.toml location

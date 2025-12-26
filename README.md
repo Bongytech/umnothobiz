@@ -3,19 +3,14 @@
 <div align="center">
 
 ![Security](https://img.shields.io/badge/Security-A%2B-brightgreen?style=for-the-badge&logo=shield)
-![DevSecOps](https://img.shields.io/badge/DevSecOps-Implemented-success?style=for-the-badge&logo=githubactions)
-![Firebase](https://img.shields.io/badge/Firebase-Cloud_Suite-orange?style=for-the-badge&logo=firebase)
+![DevSecOps](https://img.shields.io/badge/DevSecOps-Active-success?style=for-the-badge&logo=githubactions)
+![Firebase](https://img.shields.io/badge/Firebase-Suite-orange?style=for-the-badge&logo=firebase)
 
 **The Unmotho Platform implements a "Zero-Trust" architecture with an automated "Shift-Left" security pipeline.**
 
-[Explore Docs](docs/) • [Report Vulnerability](SECURITY.md) • [View Pipeline](https://github.com/unmothobiz/unmotho/actions)
+[🏗️ Architecture](#️-architecture-overview) • [📊 Security Dashboard](#-security-health-dashboard) • [⚙️ Setup](#-developer-quick-start) • [🚨 Incident Response](#-incident-response--support)
 
 </div>
-
----
-
-## 📋 Executive Summary
-**Unmotho** is a secure-by-design platform. By integrating automated security gates directly into the developer's workflow, we ensure that vulnerabilities are caught in the IDE, blocked in the PR, and monitored in Production.
 
 ---
 
@@ -24,7 +19,7 @@
 ```mermaid
 graph TD
     subgraph "💻 LOCAL DEVELOPMENT"
-        IDE[VS Code / IDE] --> PreC[Husky Pre-commit Hooks]
+        IDE[VS Code] --> PreC[Husky Pre-commit Hooks]
         PreC -->|Lint & Audit| Git[Git Push]
     end
 
@@ -41,11 +36,6 @@ graph TD
         Host --> Func[Firebase Functions]
         Func --> DB[(Cloud Firestore)]
         DB --> Rules{Security Rules}
-    end
-
-    subgraph "🛡️ COMPLIANCE & OPS"
-        Rules --> Mon[Cloud Logging]
-        Mon --> DAST[DAST: OWASP ZAP]
     end
 
     style Host fill:#f6820d,stroke:#fff,color:#fff

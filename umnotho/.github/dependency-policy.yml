@@ -1,0 +1,42 @@
+# .github/dependency-policy.yml
+version: 1
+rules:
+  - rule: "New Dependencies"
+    description: "All new dependencies require review"
+    conditions:
+      - type: "new-dependency"
+    actions:
+      - type: "require-approval"
+        approvers: ["security-team", "tech-lead"]
+        
+  - rule: "Major Version Updates"
+    description: "Major version updates require security review"
+    conditions:
+      - type: "version-update"
+        update-type: "major"
+    actions:
+      - type: "require-approval"
+        approvers: ["security-team"]
+        
+  - rule: "High/Critical Vulnerabilities"
+    description: "Auto-merge security patches for high/critical issues"
+    conditions:
+      - type: "vulnerability"
+        severity: ["high", "critical"]
+    actions:
+      - type: "auto-merge"
+        after: "1-day"
+        
+  - rule: "License Compliance"
+    description: "Block incompatible licenses"
+    blocked-licenses:
+      - "GPL-1.0"
+      - "GPL-2.0"
+      - "GPL-3.0"
+      - "AGPL-3.0"
+    allowed-licenses:
+      - "MIT"
+      - "Apache-2.0"
+      - "BSD-2-Clause"
+      - "BSD-3-Clause"
+      - "ISC"

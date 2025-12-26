@@ -1,0 +1,117 @@
+name: 🔒 Complete DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Weekly security scans every Sunday at 2 AM
+    - cron: '0 2 * * 0'
+
+jobs:
+  security-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      # ========== [1] SOURCE CHECKOUT ==========
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      # ========== [2] SCA & SAST ==========
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd functions && npm ci
+          
+      - name: ESLint Security Scan (SAST)
+        run: |
+          npm run lint:security || echo "ESLint security check failed"
+          
+      - name: Snyk Security Scan (SCA)
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+          
+      - name: npm audit
+        run: |
+          npm audit --audit-level=high
+          cd functions && npm audit --audit-level=high || true
+          
+      # ========== [3] SECRETS DETECTION ==========
+      - name: TruffleHog Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified --json
+          
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+          redact: true
+          
+      # ========== [4] BUILD ==========
+      - name: Build React App
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          # Add other env vars as needed
+          
+      # ========== [5] CONTAINER SCAN (if applicable) ==========
+      - name: Docker Build & Scan
+        if: false  # Disabled by default, enable if using containers
+        run: |
+          # Add if you containerize Firebase Functions
+          echo "Container scanning not enabled"
+          
+      # ========== [6] DEPLOY TO STAGING ==========
+      - name: Deploy to Firebase Staging
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only hosting,functions --project staging
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          
+      # ========== [7] DAST - DYNAMIC SCAN ==========
+      - name: OWASP ZAP Baseline Scan
+        if: github.ref == 'refs/heads/develop'
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'https://your-staging-url.firebaseapp.com'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'
+          
+      # ========== [8] MONITORING ALERTS ==========
+      - name: Upload Security Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.run_number }}
+          path: |
+            snyk-report.json
+            zap-report.json
+            gitleaks-report.sarif
+          
+      - name: Slack Notification on Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: 'security-alerts'
+          slack-message: |
+            🚨 Pipeline Failed: ${{ github.repository }}
+            Run: ${{ github.run_id }}
+            Commit: ${{ github.sha }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

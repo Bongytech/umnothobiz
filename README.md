@@ -1,51 +1,54 @@
 # 🛡️ Unmotho DevSecOps Platform
 
+<div align="center">
+
+![Security](https://img.shields.io/badge/Security-A%2B-brightgreen?style=for-the-badge&logo=shield)
+![DevSecOps](https://img.shields.io/badge/DevSecOps-Implemented-success?style=for-the-badge&logo=githubactions)
+![Firebase](https://img.shields.io/badge/Firebase-Cloud_Suite-orange?style=for-the-badge&logo=firebase)
+
+**The Unmotho Platform implements a "Zero-Trust" architecture with an automated "Shift-Left" security pipeline.**
+
+[Explore Docs](docs/) • [Report Vulnerability](SECURITY.md) • [View Pipeline](https://github.com/unmothobiz/unmotho/actions)
+
+</div>
+
+---
+
 ## 📋 Executive Summary
-**Unmotho** implements a **complete Shift-Left DevSecOps pipeline** that integrates security into every phase of the development lifecycle. Our architecture follows industry best practices with automated security gates, continuous monitoring, and comprehensive compliance layers.
+**Unmotho** is a secure-by-design platform. By integrating automated security gates directly into the developer's workflow, we ensure that vulnerabilities are caught in the IDE, blocked in the PR, and monitored in Production.
 
 ---
 
 ## 🏗️ Architecture Overview
 
 ```mermaid
-graph TB
-    subgraph "🌐 Source Control"
-        GH[GitHub Repository]
+graph TD
+    subgraph "💻 LOCAL DEVELOPMENT"
+        IDE[VS Code / IDE] --> PreC[Husky Pre-commit Hooks]
+        PreC -->|Lint & Audit| Git[Git Push]
     end
-    
-    subgraph "🚀 CI/CD Pipeline"
-        P1[1. SAST/ESLint] --> P2[2. SCA/Snyk]
-        P2 --> P3[3. Secrets/TruffleHog]
-        P3 --> P4[4. Build/Vite]
-        P4 --> P5[5. Security Scan]
-        P5 --> P6[6. Deploy/Firebase]
-        P6 --> P7[7. DAST/OWASP ZAP]
-        P7 --> P8[8. Monitor/Cloud Logging]
+
+    subgraph "🚀 GITHUB ACTIONS (CI/CD)"
+        Git --> SAST[SAST: ESLint/Sonar]
+        SAST --> SCA[SCA: Snyk/npm-audit]
+        SCA --> SEC[Secrets: TruffleHog]
+        SEC --> Build[Vite Secure Build]
+        Build --> Deploy[Firebase Deploy]
     end
-    
-    subgraph "🔥 Firebase Ecosystem"
-        F1[Firebase Hosting]
-        F2[Firebase Functions]
-        F3[Cloud Firestore]
+
+    subgraph "🔥 FIREBASE RUNTIME"
+        Deploy --> Host[Firebase Hosting]
+        Host --> Func[Firebase Functions]
+        Func --> DB[(Cloud Firestore)]
+        DB --> Rules{Security Rules}
     end
-    
-    GH --> P1
-    P8 --> F1
-    F1 --> F2 --> F3
-    
-    subgraph "🛡️ Security Layers"
-        SL1[Infrastructure<br/>Firebase Rules, Cloud Armor]
-        SL2[Application<br/>React Security, XSS/CSRF]
-        SL3[Data Integrity<br/>AES-256, TLS, PII]
-        SL4[Identity & Access<br/>Firebase Auth, RBAC, MFA]
+
+    subgraph "🛡️ COMPLIANCE & OPS"
+        Rules --> Mon[Cloud Logging]
+        Mon --> DAST[DAST: OWASP ZAP]
     end
-    
-    F3 --> SL1
-    F3 --> SL2
-    F3 --> SL3
-    F3 --> SL4
-    
-    style GH fill:#24292e,color:#fff
-    style P1 fill:#0d6efd,color:#fff
-    style F1 fill:#ff6b35,color:#fff
-    style SL1 fill:#28a745,color:#fff
+
+    style Host fill:#f6820d,stroke:#fff,color:#fff
+    style DB fill:#ffca28,stroke:#fff,color:#000
+    style SAST fill:#2196f3,stroke:#fff,color:#fff
+    style SEC fill:#f44336,stroke:#fff,color:#fff

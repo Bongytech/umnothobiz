@@ -6,11 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
     "preview": "vite preview",
-    "lint:security": "node security-check.js",
-    "security": "node security-check.js",
-    "precommit": "npm run security"
+    "precommit": "npm run security",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:security": "eslint . --config eslint.config.js --max-warnings 5",
+    "security": "npm run lint:security && npm audit --audit-level=high",
+    "security:ci": "npm run lint:security && npm audit --audit-level=critical",
+    "test": "vitest run",
+    "test:security": "vitest run --config vitest.security.config.ts",
+    "deploy:staging": "firebase deploy --only hosting,functions --project staging",
+    "deploy:production": "firebase deploy --only hosting,functions --project production",
+    "security:report": "node scripts/security-monitor.js"
   },
   "dependencies": {
     "@google-pay/button-react": "^3.1.0",

@@ -1,4 +1,3 @@
-cat > SECURITY.md << 'EOF'
 # 🔒 Security Policy
 
 ## Supported Versions
@@ -13,7 +12,7 @@ Currently security updates are applied to:
 
 **DO NOT** create public GitHub issues for security vulnerabilities.
 
-Instead, please email: security@umnotho.com
+Instead, please email: bongy.tech@gmail.com
 
 ### What to include:
 1. Description of the vulnerability
@@ -49,6 +48,5 @@ Instead, please email: security@umnotho.com
 - Regular penetration testing
 
 ## Contact
-- **Security Team**: security@umnotho.com
-- **Emergency**: +1-XXX-XXX-XXXX (on-call rotation)
-EOF
+- **Security Team**: bongy.tech@gmail.com
+- **Emergency**: +27-XXX-XXX-XXXX (on-call rotation)

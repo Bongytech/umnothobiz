@@ -2,11 +2,12 @@ import js from '@eslint/js';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
-import tseslint from 'typescript-eslint';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+import tsParser from '@typescript-eslint/parser';
 import securityPlugin from 'eslint-plugin-security';
 import securityNodePlugin from 'eslint-plugin-security-node';
 
-export default tseslint.config(
+export default [
   // IGNORE PATTERNS
   {
     ignores: [
@@ -21,10 +22,11 @@ export default tseslint.config(
   },
   
   // TYPESCRIPT & REACT CONFIG
+  js.configs.recommended,
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
+      parser: tsParser,
       ecmaVersion: 2020,
       globals: {
         ...globals.browser,
@@ -32,12 +34,14 @@ export default tseslint.config(
       },
     },
     plugins: {
+      '@typescript-eslint': tsPlugin,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
       'security': securityPlugin,
       'security-node': securityNodePlugin
     },
     rules: {
+      ...tsPlugin.configs.recommended.rules,
       // React rules
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
@@ -46,10 +50,10 @@ export default tseslint.config(
       ],
       
       // Security rules - adjusted for React/TypeScript
-      'security/detect-object-injection': 'off', // Too many false positives in React
-      'security/detect-non-literal-require': 'off', // TypeScript uses import
-      'security/detect-non-literal-fs-filename': 'off', // Frontend doesn't use fs
-      'security-node/detect-crlf': 'off', // Console.log warnings - usually false positives
+      'security/detect-object-injection': 'off',
+      'security/detect-non-literal-require': 'off',
+      'security/detect-non-literal-fs-filename': 'off',
+      'security-node/detect-crlf': 'off',
       
       // Keep important security rules
       'security/detect-buffer-noassert': 'error',
@@ -73,4 +77,4 @@ export default tseslint.config(
       }]
     }
   }
-);
+];

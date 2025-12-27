@@ -1,0 +1,86 @@
+title = "Unmotho Firebase Security Configuration"
+version = "2.0.0"
+
+[allowlist]
+description = "Allowlisted test files and patterns"
+paths = [
+  "test/",
+  "__tests__/",
+  "__mocks__/",
+  "*.test.ts",
+  "*.spec.ts",
+  "*.test.js",
+  "*.spec.js",
+  ".github/workflows/",  # Workflow files may contain example patterns
+  "SECURITY-SETUP.md"    # Documentation with examples
+]
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase Web API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["firebase", "api-key", "critical"]
+keywords = ["apiKey", "firebase", "AIza"]
+
+[[rules]]
+id = "firebase-service-account"
+description = "Firebase Service Account JSON"
+regex = '''"type":\s*"service_account"'''
+tags = ["firebase", "service-account", "critical"]
+keywords = ["service_account", "private_key"]
+
+[[rules]]
+id = "firebase-config-secrets"
+description = "Firebase configuration with hardcoded values"
+regex = '''apiKey\s*:\s*["'][^"']{20,}["']'''
+tags = ["firebase", "config", "secret"]
+keywords = ["apiKey", "authDomain", "projectId"]
+
+[[rules]]
+id = "environment-secrets"
+description = "Environment variable assignments with secrets"
+regex = '''(VITE_|FIREBASE_|REACT_APP_)[A-Z_]+=["'][^"']{10,}["']'''
+tags = ["env", "secret", "environment"]
+
+[[rules]]
+id = "stripe-secret-key"
+description = "Stripe Secret Key"
+regex = '''(sk|rk)_(test|live)_[0-9a-zA-Z]{24,99}'''
+tags = ["stripe", "payment", "critical"]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key Pattern"
+regex = '''["'][0-9a-zA-Z]{32,45}["']'''
+tags = ["api-key", "generic"]
+entropy = 3.5
+
+[[rules]]
+id = "jwt-secret"
+description = "JWT Secret or Private Key"
+regex = '''-----BEGIN (?:RSA|EC|DSA|PRIVATE) KEY-----'''
+tags = ["jwt", "crypto", "private-key", "critical"]
+
+[[rules]]
+id = "password-in-code"
+description = "Hardcoded password in source code"
+regex = '''password\s*[=:]\s*["'][^"']{4,}["']'''
+tags = ["password", "credential"]
+
+[[rules]]
+id = "database-url"
+description = "Database connection URL with credentials"
+regex = '''(mysql|postgres|mongodb)://[^:]+:[^@]+@'''
+tags = ["database", "credentials", "critical"]
+
+[[rules]]
+id = "aws-credentials"
+description = "AWS Access Key ID and Secret"
+regex = '''(AKIA|ASIA)[A-Z0-9]{16}'''
+tags = ["aws", "credentials", "critical"]
+
+[[rules]]
+id = "google-oauth"
+description = "Google OAuth Client Secret"
+regex = '''["']client_secret["']\s*:\s*["'][^"']{10,}["']'''
+tags = ["google", "oauth", "critical"]

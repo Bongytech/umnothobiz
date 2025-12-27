@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-12-27T07:48:52.969Z",
+  "summary": {
+    "totalChecks": 4,
+    "passedChecks": 2,
+    "warningChecks": 1,
+    "errorChecks": 1
+  },
+  "checks": [
+    {
+      "name": "npm_audit",
+      "description": "NPM Dependency Security Audit",
+      "timestamp": "2025-12-27T07:48:30.365Z",
+      "result": "error",
+      "error": "Command failed: npm audit --json\nnpm warn audit 400 Bad Request - POST https://registry.npmjs.org/-/npm/v1/security/audits/quick - Bad Request\nnpm error audit endpoint returned an error\nnpm error A complete log of this run can be found in: C:\\Users\\bongy\\AppData\\Local\\npm-cache\\_logs\\2025-12-27T07_48_15_909Z-debug-0.log\n"
+    },
+    {
+      "name": "eslint_security",
+      "description": "ESLint Security Rules Check",
+      "timestamp": "2025-12-27T07:48:35.382Z",
+      "result": "warning",
+      "output": "\n> umnotho@0.0.0 lint:security\n> eslint . --max-warnings 5\n\n\nC:\\Users\\bongy\\Documents\\code\\umnotho\\umnothobiz\\umnotho\\scripts\\security-monitor.js\n   15:7   error  '__dirname' is assigned a value but never used  no-unused-vars\n   26:1   error  'console' is not defined                        no-undef\n   27:1   error  'console' is not defined                        no-undef\n   45:3   error  'console' is not defined                        no-undef\n   46:3   error  'console' is not defined                        no-undef\n   54:5   error  'console' is not defined                        no-undef\n   57:5   error  'console' is not defined                        no-undef\n   90:14  error  'e' is defined but never used                   no-unused-vars\n  164:14  error  'e' is defined but never used                   no-unused-vars\n  181:3   error  'console' is not defined                        no-undef\n  203:34  error  'process' is not defined                        no-undef\n  222:7   error  'cons",
+      "errors": 46
+    },
+    {
+      "name": "outdated_deps",
+      "description": "Outdated Dependencies Check",
+      "timestamp": "2025-12-27T07:48:52.964Z",
+      "result": "success",
+      "summary": {
+        "totalOutdated": 0
+      }
+    },
+    {
+      "name": "malicious_packages",
+      "description": "Malicious Packages Check",
+      "timestamp": "2025-12-27T07:48:52.965Z",
+      "result": "success"
+    }
+  ]
+}

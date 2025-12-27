@@ -1,0 +1,20 @@
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "security-team"
+    commit-message:
+      prefix: "security"
+    labels:
+      - "dependencies"
+      - "security"
+    allow:
+      - dependency-type: "production"
+    ignore:
+      - dependency-name: "webpack*"
+        update-types: ["version-update:semver-major"]

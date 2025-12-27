@@ -25,6 +25,15 @@ const Auth: React.FC = () => {
     }
   };
 
+  const handleGoogleAuth = async () => {
+    try {
+      await signInWithGoogle(); // This will handle both signup and login using Google
+    } catch (error) {
+      console.error("Google Authentication error", error);
+      alert("Google Authentication failed. Please try again.");
+    }
+  };
+
   const handlePricing = () => navigate('/pricing');
   const handleLogoClick = () => navigate('/');
 
@@ -40,6 +49,8 @@ const Auth: React.FC = () => {
       </nav>
       <div style={{ padding: '20px', textAlign: 'left' }}>
         <h2>{isLogin ? "Login" : "Sign Up"}</h2>
+        
+        {/* Username input only for Sign Up */}
         {!isLogin && (
           <input
             type="text"
@@ -48,6 +59,8 @@ const Auth: React.FC = () => {
             onChange={(e) => setUsername(e.target.value)}
           />
         )}
+        
+        {/* Email and Password fields */}
         <input
           type="email"
           placeholder="Email"
@@ -60,13 +73,22 @@ const Auth: React.FC = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        
+        {/* Email/Password Auth Button */}
         <button onClick={handleAuth}>
           {isLogin ? "Login" : "Sign Up"}
         </button>
-        <button onClick={signInWithGoogle} style={{ marginTop: '10px', background: '#1f1f1g', color: '#ffd700', border: 'none' }}>
-          Sign in with Google
+
+        {/* Google Auth Button */}
+        <button 
+          onClick={handleGoogleAuth} 
+          style={{ marginTop: '10px', border: 'none', padding: '10px', cursor: 'pointer' }}
+        >
+          {isLogin ? "Sign in with Google" : "Sign up with Google"}
         </button>
-        <p onClick={() => setIsLogin(!isLogin)}>
+        
+        {/* Toggle Login/Signup */}
+        <p onClick={() => setIsLogin(!isLogin)} style={{ cursor: 'pointer' }}>
           {isLogin ? "Create an account" : "Already have an account? Login"}
         </p>
       </div>

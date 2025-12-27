@@ -12,9 +12,7 @@ We follow these core principles:
 4. **Continuous Monitoring**: Real-time threat detection and rapid response.
 5. **Transparency**: Open and honest communication about our security practices.
 
----
-
-## 🛡️ Security Features
+Instead, please email: bongy.tech@gmail.com
 
 ### Authentication & Authorization
 - **Multi-factor Authentication (MFA)**: Mandatory for all administrative and privileged accounts.
@@ -33,8 +31,6 @@ We follow these core principles:
 - **Output Encoding**: Context-aware encoding to prevent injection attacks.
 - **CSRF Protection**: Implementation of the Synchronizer Token Pattern.
 - **XSS Prevention**: Strict Content Security Policy (CSP) and React-native sanitization.
-
----
 
 ## 🔍 Security Testing
 
@@ -60,8 +56,6 @@ npm run lint:security
 | **SCA** | npm audit / Snyk | Daily | Dependency vulnerability scanning |
 | **Secrets** | TruffleHog | Pre-push | Detect secrets/keys leaked in code |
 | **Container** | Trivy | CI/CD | Container image vulnerability scanning |
-
----
 
 ## 📊 Security Monitoring
 
@@ -106,8 +100,6 @@ monitoring:
 | **Customers** | 4 hours (if affected) | Status Page / Email |
 | **Public** | 24 hours (if required) | Official Blog / Social Media |
 
----
-
 ## 🔐 Secure Development
 
 ### Security Requirements
@@ -128,8 +120,6 @@ const getUserInsecure = (userId: string) => {
   return db.query(`SELECT * FROM users WHERE id = ${userId}`);
 };
 ```
-
----
 
 ## 📋 Compliance
 
@@ -176,3 +166,6 @@ Last Updated: 2025-12-27
 
 </div>
 ```
+## Contact
+- **Security Team**: bongy.tech@gmail.com
+- **Emergency**: +27-XXX-XXX-XXXX (on-call rotation)

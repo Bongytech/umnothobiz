@@ -114,3 +114,4 @@ EOF.env.local
 .env.production
 *.env
 .env
+.env

@@ -1,0 +1,73 @@
+{
+  "timestamp": "2025-12-27T13:02:24.712Z",
+  "summary": {
+    "totalChecks": 4,
+    "passedChecks": 3,
+    "warningChecks": 1,
+    "errorChecks": 0
+  },
+  "checks": [
+    {
+      "name": "npm_audit",
+      "description": "NPM Dependency Security Audit",
+      "timestamp": "2025-12-27T13:02:13.667Z",
+      "result": "success",
+      "data": {
+        "auditReportVersion": 2,
+        "vulnerabilities": {},
+        "metadata": {
+          "vulnerabilities": {
+            "info": 0,
+            "low": 0,
+            "moderate": 0,
+            "high": 0,
+            "critical": 0,
+            "total": 0
+          },
+          "dependencies": {
+            "prod": 151,
+            "dev": 314,
+            "optional": 49,
+            "peer": 7,
+            "peerOptional": 0,
+            "total": 464
+          }
+        }
+      },
+      "summary": {
+        "vulnerabilities": {
+          "info": 0,
+          "low": 0,
+          "moderate": 0,
+          "high": 0,
+          "critical": 0,
+          "total": 0
+        },
+        "totalDependencies": 0
+      }
+    },
+    {
+      "name": "eslint_security",
+      "description": "ESLint Security Rules Check",
+      "timestamp": "2025-12-27T13:02:18.079Z",
+      "result": "warning",
+      "output": "\n> umnotho@0.0.0 lint:security\n> eslint . --max-warnings 5\n\n\nC:\\Users\\bongy\\Documents\\code\\umnotho\\umnothobiz\\umnotho\\scripts\\security-monitor.js\n   15:7   error  '__dirname' is assigned a value but never used  no-unused-vars\n   26:1   error  'console' is not defined                        no-undef\n   27:1   error  'console' is not defined                        no-undef\n   45:3   error  'console' is not defined                        no-undef\n   46:3   error  'console' is not defined                        no-undef\n   54:5   error  'console' is not defined                        no-undef\n   57:5   error  'console' is not defined                        no-undef\n   90:14  error  'e' is defined but never used                   no-unused-vars\n  164:14  error  'e' is defined but never used                   no-unused-vars\n  181:3   error  'console' is not defined                        no-undef\n  203:34  error  'process' is not defined                        no-undef\n  222:7   error  'cons",
+      "errors": 46
+    },
+    {
+      "name": "outdated_deps",
+      "description": "Outdated Dependencies Check",
+      "timestamp": "2025-12-27T13:02:24.704Z",
+      "result": "success",
+      "summary": {
+        "totalOutdated": 0
+      }
+    },
+    {
+      "name": "malicious_packages",
+      "description": "Malicious Packages Check",
+      "timestamp": "2025-12-27T13:02:24.707Z",
+      "result": "success"
+    }
+  ]
+}

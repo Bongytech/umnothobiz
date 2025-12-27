@@ -13,7 +13,8 @@
     "security": "npm run lint:security && npm audit --audit-level=high",
     "security:ci": "npm run lint:security && npm audit --audit-level=critical",
     "test": "vitest run",
-    "test:security": "vitest run --config vitest.security.config.ts",
+    "test:security": "vitest run --config vitest.security.config.ts", 
+	"deploy": "firebase deploy --only hosting",
     "deploy:staging": "firebase deploy --only hosting,functions --project staging",
     "deploy:production": "firebase deploy --only hosting,functions --project production",
     "security:report": "node scripts/security-monitor.js"

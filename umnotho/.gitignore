@@ -25,12 +25,7 @@ dist-ssr
 # ==================== SECRETS ==================== #
 # Environment files
 .env
-.env.local
-.env.*.local
-.env.production
-.env.development
-.env.test
-.env.staging
+
 
 # Firebase secrets
 service-account*.json
@@ -115,3 +110,13 @@ EOF.env.local
 *.env
 .env
 .env
+# Environment
+.env
+
+
+# Secrets
+*.pem
+*.key
+*.cert
+secrets*.json
+config/production.json

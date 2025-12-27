@@ -165,15 +165,14 @@ We appreciate security researchers who help keep our users safe. If you've disco
 ### Security Contacts
 | Role | Name | Contact |
 | :--- | :--- | :--- |
-| Security Lead | Alex Morgan | security-lead@your-org.com |
-| CTO | Jamie Smith | cto@your-org.com |
-| Emergency | Security Team | +1-XXX-XXX-XXXX |
+| Security Lead | Bongy|bongy.tech@gmail.com |
+| Emergency | Security Team | +27-XXX-XXX-XXXX |
 
 <div align="center">
 
-Last Updated: 2023-10-27
+Last Updated: 2025-12-27
 
-[🔙 Back to Main README](./README.md) • [👨‍💻 Developer Guide](./docs/DEVELOPMENT.md)
+[🔙 Back to Main README](./README.md) • [👨‍💻 Developer Guide](./DEVELOPMENT.md)
 
 </div>
 ```

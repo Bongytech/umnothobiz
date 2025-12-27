@@ -37,14 +37,14 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/umnotho.git
+git https://github.com/Bongytech/umnothobiz.git
 cd umnotho
 
 # Install dependencies
 npm install
 
 # Set up environment variables
-cp .env.example .env.local
+cp .env.umnotho .env.local
 
 # Start development server
 npm run dev
@@ -77,7 +77,7 @@ npm run dev
 
 ## 🔧 Development
 
-For detailed development guidelines, see our [Developer Documentation](./docs/DEVELOPMENT.md).
+For detailed development guidelines, see our [Developer Documentation](./DEVELOPMENT.md).
 
 ### Development Workflow
 1. **Fork** the repository.
@@ -182,7 +182,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 Made with ❤️ by the **UMNOTHO Team**
 
-[📖 Developer Guide](./DEVELOPMENT.md) • [🔒 Security Guide](./SECURITY.md) • [🐛 Report Bug](https://github.com/your-org/umnotho/issues) • [✨ Request Feature](https://github.com/your-org/umnotho/discussions)
+[📖 Developer Guide](./DEVELOPMENT.md) • [🔒 Security Guide](./SECURITY.md) • [🐛 Report Bug](mailto:bongytech@gmail.com?subject=Bug%20Report%20-%20UMNOTHO%20Platform) • [✨ Request Feature](mailto:bongytech@gmail.com?subject=Feature%20Request%20-%20UMNOTHO%20Platform)
 
 </div>
 ```

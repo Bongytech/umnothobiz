@@ -14,7 +14,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/umnotho.git
+git clone https://github.com/Bongytech/umnothobiz.git
 cd umnotho
 
 # 2. Install dependencies
@@ -223,5 +223,5 @@ We pledge to make participation in our community a harassment-free experience fo
 - Focus on what is best for the community.
 
 ## Enforcement
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project team at `admin@your-org.com`.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project team at `bongy.tech@gmail.com`.
 ```

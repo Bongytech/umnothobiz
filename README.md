@@ -1,5 +1,14 @@
 ```markdown
 # 🔐 UMNOTHO - Secure Business Platform
+## 🚀 Quick Start
+
+### 🌐 Live Application
+**Production URL:** [https://umnothobiz.web.app/](https://umnothobiz.web.app/)
+
+### Prerequisites
+- Node.js 18+ & npm 9+
+- Git
+- Modern browser (Chrome 90+, Firefox 88+, Safari 14+)
 
 ## ✨ Features
 
@@ -185,4 +194,5 @@ Made with ❤️ by the **UMNOTHO Team**
 [📖 Developer Guide](./DEVELOPMENT.md) • [🔒 Security Guide](./SECURITY.md) • [🐛 Report Bug](mailto:bongytech@gmail.com?subject=Bug%20Report%20-%20UMNOTHO%20Platform) • [✨ Request Feature](mailto:bongytech@gmail.com?subject=Feature%20Request%20-%20UMNOTHO%20Platform)
 
 </div>
+
 ```

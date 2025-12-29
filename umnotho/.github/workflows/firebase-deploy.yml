@@ -1,0 +1,116 @@
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [ main ]  # Auto-deploy on main branch
+  pull_request:
+    branches: [ main ]  # Build PRs but don't deploy
+  workflow_dispatch:    # Manual trigger option
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment: production  # Uses GitHub environment
+    
+    steps:
+    # 1. Checkout code
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get all history for proper versioning
+    
+    # 2. Setup Node.js
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'pnpm'
+    
+    # 3. Setup pnpm
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ env.PNPM_VERSION }}
+        run_install: false
+    
+    # 4. Install dependencies
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    # 5. CREATE .env FILE WITH SECRETS
+    - name: Create environment file
+      run: |
+        echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" > .env.production
+        echo "VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}" >> .env.production
+        echo "VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> .env.production
+        echo "VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" >> .env.production
+        echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}" >> .env.production
+        echo "VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}" >> .env.production
+        
+        # Add any other non-sensitive env vars
+        echo "VITE_APP_NAME=UMNOTHO" >> .env.production
+        echo "VITE_APP_VERSION=1.0.0" >> .env.production
+        echo "VITE_API_URL=https://api.umnotho.com" >> .env.production
+        echo "NODE_ENV=production" >> .env.production
+        
+        # Show that env file was created (without revealing secrets)
+        echo "✅ Created .env.production file"
+        echo "Environment variables count: $(wc -l < .env.production)"
+    
+    # 6. Build the project WITH production env
+    - name: Build project
+      env:
+        # Pass secrets directly to build process
+        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      run: |
+        echo "Building with production environment variables..."
+        pnpm run build
+        
+        # Verify build output
+        echo "Build output:"
+        ls -la dist/
+        echo "✅ Build completed successfully"
+    
+    # 7. Install Firebase CLI
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+    
+    # 8. Deploy to Firebase Hosting
+    - name: Deploy to Firebase
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: '${{ secrets.GITHUB_TOKEN }}'
+        firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+        channelId: live
+        projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+    
+    # 9. Create deployment summary
+    - name: Create deployment summary
+      if: success()
+      run: |
+        echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Project:** UMNOTHO" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployed:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Build Info" >> $GITHUB_STEP_SUMMARY
+        echo "- Node.js: ${{ env.NODE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Package Manager: pnpm ${{ env.PNPM_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🌐 Deployment URL" >> $GITHUB_STEP_SUMMARY
+        echo "Your site is now live at:" >> $GITHUB_STEP_SUMMARY
+        echo "- https://${{ secrets.VITE_FIREBASE_PROJECT_ID }}.web.app" >> $GITHUB_STEP_SUMMARY
+        echo "- https://${{ secrets.VITE_FIREBASE_PROJECT_ID }}.firebaseapp.com" >> $GITHUB_STEP_SUMMARY

@@ -1,36 +1,25 @@
-```markdown
-# 🔐 UMNOTHO - Secure Business Platform
-## 🚀 Quick Start
-
-### 🌐 Live Application
-**Production URL:** [https://umnothobiz.web.app/](https://umnothobiz.web.app/)
-
-### Prerequisites
-- Node.js 18+ & npm 9+
-- Git
-- Modern browser (Chrome 90+, Firefox 88+, Safari 14+)
+# 🔐 UMNOTHO - Peer-to-Peer Barter Platform
 
 ## ✨ Features
 
 ### 🛡️ **Security Features**
-- **End-to-End Encryption:** Sensitive data is encrypted at rest and in transit.
-- **RBAC:** Granular Role-Based Access Control.
-- **MFA:** Integrated multi-factor authentication.
-- **Audit Logging:** Comprehensive security logs for all critical actions.
-- **Threat Detection:** Real-time monitoring for suspicious activities.
+- **Authentication:** Secure user authentication with Firebase
+- **Data Protection:** Encrypted data storage and secure API communication
+- **Audit Logging:** Activity tracking for user actions
+- **Authorization:** User role and permission management
 
-### 📊 **Business Features**
-- **Dashboard Analytics:** Visual representation of key performance indicators.
-- **Client Management:** Secure CRM for handling client relations.
-- **Financial Tracking:** Expense reporting and revenue monitoring.
-- **Inventory Management:** Real-time stock tracking and alerts.
-- **Reporting Engine:** Customizable business intelligence reports.
+### 📊 **Platform Features**
+- **Barter Listings:** Create and browse goods/services for exchange
+- **Bid Management:** Place, negotiate, and manage trade offers
+- **User Messaging:** In-app communication between traders
+- **Reputation System:** Community-based trust scoring
+- **Location-Based Matching:** Find trades based on proximity
 
 ### 🔌 **Technical Features**
-- **Real-time Updates:** Powered by WebSockets for instant data synchronization.
-- **Offline Capability:** Progressive Web App (PWA) features for intermittent connectivity.
-- **Responsive Design:** Optimized for Desktop, Tablet, and Mobile.
-- **API-First:** Built on a robust, documented REST API.
+- **Real-time Updates:** Live data synchronization via Firestore listeners
+- **Responsive Design:** Mobile-friendly interface for all devices
+- **Offline Support:** Basic offline functionality with local caching
+- **Type Safety:** Full TypeScript implementation across the stack
 
 ---
 
@@ -40,20 +29,22 @@
 - **Node.js:** 18.x or higher
 - **npm:** 9.x or higher
 - **Git:** Latest version
+- **Firebase Account:** For backend services
 - **Browser:** Modern Evergreen Browser (Chrome 90+, Firefox 88+, Safari 14+)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git https://github.com/Bongytech/umnothobiz.git
+git clone https://github.com/Bongytech/umnothobiz.git
 cd umnotho
 
 # Install dependencies
 npm install
 
 # Set up environment variables
-cp .env.umnotho .env.local
+cp .env.example .env
+# Add your Firebase configuration to .env
 
 # Start development server
 npm run dev
@@ -63,24 +54,30 @@ npm run dev
 
 | Command | Description |
 | :--- | :--- |
-| `npm run dev` | Start development server with HMR |
+| `npm run dev` | Start development server |
 | `npm run build` | Build the application for production |
-| `npm run preview` | Locally preview the production build |
-| `npm run test` | Run the full test suite (Unit + Integration) |
-| `npm run security:report` | Generate a detailed security audit report |
-| `npm run lint` | Run ESLint and Prettier checks |
+| `npm run preview` | Preview the production build locally |
+| `npm run test` | Run test suite |
+| `npm run lint` | Run code quality checks |
 
 ---
 
 ## 🏗️ Architecture
 
-### Key Components
-- **Frontend:** React 18 + TypeScript + Vite
+### Tech Stack
+- **Frontend:** React 18 + TypeScript
 - **State Management:** React Context API + Custom Hooks
 - **Routing:** React Router v6
-- **Styling:** Tailwind CSS + CSS Modules
-- **API Communication:** Axios + React Query (TanStack Query)
-- **Security:** JWT + OAuth2 + Custom Security Middleware
+- **Styling:** CSS Modules / Styled Components
+- **Backend:** Firebase (Firestore, Authentication, Storage)
+- **Real-time Communication:** Firestore listeners
+- **API Communication:** Firebase SDK + Custom API calls
+
+### Key Integrations
+- **Firebase Firestore:** Real-time database and data storage
+- **Firebase Authentication:** User management and security
+- **Firebase Storage:** File and image uploads
+- **Firebase Hosting:** Application deployment
 
 ---
 
@@ -91,70 +88,65 @@ For detailed development guidelines, see our [Developer Documentation](./DEVELOP
 ### Development Workflow
 1. **Fork** the repository.
 2. **Clone** your fork.
-3. **Branch** from `develop` (`git checkout -b feature/amazing-feature`).
+3. **Branch** from `main` (`git checkout -b feature/amazing-feature`).
 4. **Code** with accompanying tests.
 5. **Test** your changes locally.
 6. **Push** to your fork.
 7. **PR** to the upstream repository.
 
 ### Code Standards
-- TypeScript **strict mode** is mandatory.
-- ESLint configured with **security plugins**.
-- **Prettier** for consistent code formatting.
-- **Conventional Commits** (feat:, fix:, docs:, etc.).
-- Minimum **90% test coverage** required for PR approval.
+- TypeScript for all new code
+- ESLint for code quality
+- Prettier for consistent formatting
+- Meaningful commit messages
+- Regular dependency updates
 
 ---
 
 ## 🔒 Security
 
-Security is our top priority. For comprehensive security information, see our [Security Documentation](./SECURITY.md).
+Security is important. For comprehensive security information, see our [Security Documentation](./SECURITY.md).
 
-### Security Features Implemented
-- ✅ Automated vulnerability scanning (Snyk/GitHub Actions)
-- ✅ Regular dependency auditing
-- ✅ OWASP Top 10 mitigation
-- ✅ Secure coding practices (Sanitization, CSRF protection)
-- ✅ Periodic penetration testing
+### Current Security Features
+- ✅ Firebase Authentication with email verification
+- ✅ Firestore Security Rules for data protection
+- ✅ Input validation and sanitization
+- ✅ Secure API key management
+- ✅ Regular dependency updates
 
 ### Reporting Security Issues
-Found a security vulnerability? Please **do not** open a public issue. Report it responsibly via our [Security Policy](./SECURITY.md#reporting-a-vulnerability).
+Found a security vulnerability? Please **do not** open a public issue. Report it responsibly via email.
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
+# Run tests
 npm run test
 
 # Run tests with coverage
 npm run test:coverage
 
-# Run tests in watch mode
-npm run test:watch
-
-# Run security specific tests
-npm run security:report
+# Run linting checks
+npm run lint
 ```
 
-- **Unit Tests:** Vitest + React Testing Library
-- **Integration Tests:** Playwright
-- **Security Tests:** Custom automated security scanners
-- **Performance:** Lighthouse CI integration
+- **Unit Tests:** React Testing Library
+- **Integration Tests:** Manual testing with Firebase Emulator
+- **Security Checks:** Basic vulnerability scanning
 
 ---
 
 ## 📚 Documentation
 
 ### Project Documentation
-- [API Documentation](./docs/api.md) - REST API specifications
-- [Architecture](./docs/architecture.md) - System design documents
-- [Deployment](./docs/deployment.md) - Deployment guides
-- [Troubleshooting](./docs/troubleshooting.md) - Common issues & solutions
+- [Setup Guide](./docs/setup.md) - Getting started instructions
+- [Firebase Configuration](./docs/firebase.md) - Backend setup
+- [Data Models](./docs/models.md) - Database structure
+- [API Reference](./docs/api.md) - Available endpoints
 
 ### Quick Links
-- [Changelog](./CHANGELOG.md)
 - [Contributing Guidelines](./CONTRIBUTING.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
 - [License](./LICENSE)
@@ -168,24 +160,42 @@ We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTIN
 - 🐛 **Report bugs** - Open an issue
 - ✨ **Suggest features** - Start a discussion
 - 📝 **Improve docs** - Submit a PR
-- 🔧 **Fix issues** - Check the "Help Wanted" label
-- 🧪 **Add tests** - Help us reach 100% coverage
+- 🔧 **Fix issues** - Check open issues
 
 ---
 
-## 📄 License
+## 📄 License & Usage Terms
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+**UMNOTHO** is released under a **source-available, non-commercial license**. This project is primarily a **portfolio piece and community collaboration experiment**, not a production-ready commercial product.
+
+### ✅ **What you CAN do:**
+- View, study, and learn from the source code
+- Use the software for personal or educational purposes
+- Contribute improvements via pull requests
+- Fork and modify for non-commercial projects
+- Share with others for learning purposes
+
+### ⚠️ **What you CANNOT do without explicit permission:**
+- Use this software for commercial purposes
+- Resell, monetize, or charge for access to this software
+- Offer this software as a paid service (SaaS)
+- Use this software in production environments for business revenue
+- Incorporate into commercial products without written consent
+
+### 🎯 **Project Intent:**
+This is a **portfolio demonstration project** showcasing full-stack development skills with Firebase and React. It's not intended for commercial deployment by third parties. For commercial licensing inquiries, please contact the author directly.
+
+**Legal Note:** For the complete legal terms, please read the full license file. This summary is for convenience only and does not replace the actual license terms.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [Vite](https://vitejs.dev/) for the amazing build tool.
-- [React](https://reactjs.org/) for the UI library.
-- [TypeScript](https://www.typescriptlang.org/) for type safety.
-- [Tailwind CSS](https://tailwindcss.com/) for styling.
-- All our amazing contributors!
+- [React](https://reactjs.org/) for the UI library
+- [TypeScript](https://www.typescriptlang.org/) for type safety
+- [Firebase](https://firebase.google.com/) for backend services
+- [Vite](https://vitejs.dev/) for build tooling
+- All contributors and supporters!
 
 <div align="center">
 
@@ -194,5 +204,3 @@ Made with ❤️ by the **UMNOTHO Team**
 [📖 Developer Guide](./DEVELOPMENT.md) • [🔒 Security Guide](./SECURITY.md) • [🐛 Report Bug](mailto:bongytech@gmail.com?subject=Bug%20Report%20-%20UMNOTHO%20Platform) • [✨ Request Feature](mailto:bongytech@gmail.com?subject=Feature%20Request%20-%20UMNOTHO%20Platform)
 
 </div>
-
-```

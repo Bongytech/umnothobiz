@@ -1,5 +1,7 @@
 # 🔐 UMNOTHO - Peer-to-Peer Barter Platform
+## 🌐 Live Demo
 
+Try out the live application: [**UMNOTHO Live Demo**](https://umnothobiz.web.app/)
 ## ✨ Features
 
 ### 🛡️ **Security Features**

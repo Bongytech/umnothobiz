@@ -1,0 +1,13 @@
+name: Test Auto-Deploy
+on:
+  push:
+    branches: [ test-auto-deploy ]  # Only this branch
+
+jobs:
+  test-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - run: echo "íº€ Test deployment would run here!"
+    - run: echo "Firebase API Key present: ${{ secrets.VITE_FIREBASE_API_KEY != '' }}"
+

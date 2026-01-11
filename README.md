@@ -151,7 +151,7 @@ npm run lint
 ### Quick Links
 - [Contributing Guidelines](./CONTRIBUTING.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
-- [License](./LICENSE)
+- [License](./LICENSE.md)
 
 ---
 
@@ -206,3 +206,4 @@ Made with ❤️ by the **UMNOTHO Team**
 [📖 Developer Guide](./DEVELOPMENT.md) • [🔒 Security Guide](./SECURITY.md) • [🐛 Report Bug](mailto:bongytech@gmail.com?subject=Bug%20Report%20-%20UMNOTHO%20Platform) • [✨ Request Feature](mailto:bongytech@gmail.com?subject=Feature%20Request%20-%20UMNOTHO%20Platform)
 
 </div>
+

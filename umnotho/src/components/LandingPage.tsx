@@ -1,40 +1,11 @@
-// src/components/LandingPage.tsx
-import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../App.css'; // Import the global CSS file
+import '../App.css'; 
 import logo from '../assets/Umnotho2.png';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [isDarkTheme, setIsDarkTheme] = useState(false);
-
-  // Load theme preference from localStorage if available
-  useEffect(() => {
-    const storedTheme = localStorage.getItem('theme');
-    if (storedTheme === 'dark') {
-      setIsDarkTheme(true);
-      document.documentElement.classList.add('dark-theme');
-    } else {
-      document.documentElement.classList.add('light-theme');
-    }
-  }, []);
-
-  // Function to toggle theme and apply it globally
-  const toggleTheme = () => {
-    const newTheme = isDarkTheme ? 'light' : 'dark';
-    setIsDarkTheme(!isDarkTheme);
-
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark-theme');
-      document.documentElement.classList.remove('light-theme');
-    } else {
-      document.documentElement.classList.add('light-theme');
-      document.documentElement.classList.remove('dark-theme');
-    }
-
-    localStorage.setItem('theme', newTheme); // Save theme preference
-  };
-
+ 
+  
   // Navigation handlers
   const handleLogin = () => navigate('/auth');
   const handlePricing = () => navigate('/pricing');
@@ -50,10 +21,7 @@ const LandingPage: React.FC = () => {
         <div className="nav-buttons">
           <button className="nav-button" onClick={handleLogin}>Login</button>
           <button className="nav-button" onClick={handlePricing}>Pricing</button>
-          {/* Theme toggle button */}
-          <button className="nav-button" onClick={toggleTheme}>
-            {isDarkTheme ? 'Light Mode' : 'Dark Mode'}
-          </button>
+          
         </div>
       </nav>
 

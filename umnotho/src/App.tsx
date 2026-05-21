@@ -1,5 +1,8 @@
-// src/App.tsx
-import React from 'react';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Auth from './components/Auth';
@@ -7,7 +10,7 @@ import Barter from './components/Barter';
 import Pricing from './components/Pricing'; 
 import MyBids from './components/MyBids';
 
-const App: React.FC = () => {
+export default function App() {
   return (
     <Router>
       <Routes>
@@ -15,11 +18,8 @@ const App: React.FC = () => {
         <Route path="/auth" element={<Auth />} />
         <Route path="/barter" element={<Barter />} /> 
         <Route path="/pricing" element={<Pricing />} /> 
-		<Route path="/my-bids" element={<MyBids />} /> 
-        {/* Add other routes as needed */}
+        <Route path="/my-bids" element={<MyBids />} /> 
       </Routes>
     </Router>
   );
-};
-
-export default App;
+}

@@ -13,22 +13,27 @@
     "security": "npm run lint:security && npm audit --audit-level=high",
     "security:ci": "npm run lint:security && npm audit --audit-level=critical",
     "test": "vitest run",
-    "test:security": "vitest run --config vitest.security.config.ts", 
-	"deploy": "firebase deploy --only hosting",
+    "test:security": "vitest run --config vitest.security.config.ts",
+    "deploy": "firebase deploy --only hosting",
     "deploy:staging": "firebase deploy --only hosting,functions --project staging",
     "deploy:production": "firebase deploy --only hosting,functions --project production",
     "security:report": "node scripts/security-monitor.js"
   },
   "dependencies": {
-    "@google-pay/button-react": "^3.1.0",
+    "@google-pay/button-react": "^3.2.1",
     "fastify": "^5.0.0",
-    "firebase": "^11.0.1",
+    "firebase": "^11.10.0",
     "google-pay-button": "github:google-pay/google-pay-button",
+    "lucide-react": "^1.7.0",
+    "motion": "^12.38.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@tailwindcss/vite": "^4.3.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@types/firebase": "^2.4.32",
@@ -47,6 +52,7 @@
     "globals": "^15.11.0",
     "happy-dom": "^20.0.11",
     "jsdom": "^27.0.1",
+    "tailwindcss": "^4.3.0",
     "typescript": "~5.6.2",
     "vite": "^6.4.1",
     "vitest": "^4.0.16"

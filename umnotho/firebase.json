@@ -12,18 +12,41 @@
       ]
     }
   ],
-
   "hosting": {
     "site": "umnothobiz",
-
     "public": "dist",
-	"rewrites": [
-    {
-      "source": "**",
-      "destination": "/index.html"
-    }
-  	]
-   
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "database": "umnothobiz",
+    "location": "nam5",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "database": {
+      "port": 9000
+    },
+    "hosting": {
+      "port": 5000
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
   }
 }
-

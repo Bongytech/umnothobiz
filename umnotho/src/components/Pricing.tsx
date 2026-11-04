@@ -10,7 +10,6 @@ import {
   ExternalLink,
   Info,
   Loader2,
-  ShieldCheck,
   Wallet,
   X,
 } from 'lucide-react';
@@ -233,15 +232,6 @@ export default function Pricing() {
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
             Choose the plan that fits your trading needs. Prices are in rand; paid plans are
             settled in USDT.
-          </p>
-        </div>
-
-        <div className="max-w-6xl mx-auto mb-8 rounded-2xl border border-umnotho/20 bg-umnotho/5 p-4 text-sm text-umnotho flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
-          <p>
-            Crypto checkout is server-verified. The USDT amount is locked when you start checkout,
-            and a plan is activated only after Cloud Functions confirms the payment. No private
-            keys or card details are handled by the browser.
           </p>
         </div>
 
@@ -556,8 +546,7 @@ export default function Pricing() {
                   </div>
 
                   <p className="mt-4 text-xs text-gray-500">
-                    Keep this window open; the status refreshes automatically. Plans are activated
-                    by the server, not by this browser.
+                    Keep this window open while we confirm your payment.
                   </p>
                 </>
               )}

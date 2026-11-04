@@ -62,20 +62,21 @@ export default function StartupError({
           </div>
           <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
             <li>
-              Copy <code className="text-umnotho">.env.example</code> to{' '}
-              <code className="text-umnotho">.env.local</code> in the <code>umnotho/</code>{' '}
-              folder.
+              Run <code className="text-umnotho">npm run setup:env</code> to pull the public
+              Firebase web config from the live demo.
             </li>
             <li>
-              Paste the web app values from Firebase console → Project settings → Your apps →
-              Web app.
+              Or copy <code className="text-umnotho">.env.example</code> to{' '}
+              <code className="text-umnotho">.env.local</code> and paste the values from Firebase
+              console → Project settings → Your apps → Web app.
             </li>
             <li>
               Restart the dev server with <code className="text-umnotho">npm run dev</code>.
             </li>
           </ol>
           <p className="mt-4 text-xs text-gray-500">
-            The values are identifiers, not server secrets. Access is enforced by Firebase
+            The Firebase web config is public (it ships in every deployed build); no private
+            server key is needed to run the frontend. Access is enforced by Firebase
             Authentication and Firestore rules.
           </p>
         </div>

@@ -17,6 +17,8 @@ export default [
       '*.log',
       'coverage/**',
       '.firebase/**',
+      'functions/lib/**',
+      'functions/node_modules/**',
       'security-check.js'
     ]
   },
@@ -91,6 +93,16 @@ export default [
     },
     rules: {
       'no-unused-vars': ['error', { caughtErrors: 'none' }],
+    },
+  },
+
+  // CLOUD FUNCTIONS RUN IN NODE
+  {
+    files: ['functions/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
     },
   },
 

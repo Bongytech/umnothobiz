@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
-import { Calendar, Mail, Package, Star, UserRound } from 'lucide-react';
+import { Calendar, Crown, Mail, Package, Star, UserRound } from 'lucide-react';
 import AppNav from './AppNav';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
@@ -11,6 +12,9 @@ interface ProfileData {
   email: string;
   ratings: Record<string, number>;
   createdAt: Date | null;
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  subscriptionExpiresAt: Date | null;
 }
 
 function toDate(value: unknown): Date | null {
@@ -18,8 +22,15 @@ function toDate(value: unknown): Date | null {
   return timestamp && typeof timestamp.toDate === 'function' ? timestamp.toDate() : null;
 }
 
+const PLAN_NAMES: Record<string, string> = {
+  free: 'Freemium',
+  basic: 'Basic',
+  biz: 'Biz',
+};
+
 export default function Profile() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [listingCount, setListingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -40,6 +51,9 @@ export default function Profile() {
               ? (data.ratings as Record<string, number>)
               : {},
           createdAt: toDate(data.createdAt),
+          subscriptionTier: String(data.subscriptionTier ?? 'free'),
+          subscriptionStatus: String(data.subscriptionStatus ?? 'inactive'),
+          subscriptionExpiresAt: toDate(data.subscriptionExpiresAt),
         });
         setLoading(false);
       },
@@ -148,6 +162,36 @@ export default function Profile() {
                 No ratings yet. Complete a trade and your partner can rate you.
               </p>
             )}
+          </section>
+
+          <section className="rounded-3xl border border-white/10 bg-dark-900 p-8 md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-umnotho/10 text-umnotho flex items-center justify-center shrink-0">
+              <Crown className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">Current plan</p>
+              <p className="text-xl font-display font-bold text-white">
+                {PLAN_NAMES[profile?.subscriptionTier ?? 'free'] ?? 'Freemium'}
+              </p>
+              <p className="text-sm text-gray-400">
+                {profile?.subscriptionTier && profile.subscriptionTier !== 'free'
+                  ? `Status: ${profile.subscriptionStatus}${
+                      profile.subscriptionExpiresAt
+                        ? ` · renews/expires ${profile.subscriptionExpiresAt.toLocaleDateString()}`
+                        : ''
+                    }`
+                  : 'Free plan — upgrade to unlock unlimited trades.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/pricing')}
+              className="rounded-xl border border-umnotho/30 bg-umnotho/10 px-4 py-2.5 text-sm font-semibold text-umnotho hover:bg-umnotho/20"
+            >
+              {profile?.subscriptionTier && profile.subscriptionTier !== 'free'
+                ? 'Extend plan'
+                : 'Upgrade'}
+            </button>
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-dark-900 p-8 md:col-span-2 flex items-center gap-4">

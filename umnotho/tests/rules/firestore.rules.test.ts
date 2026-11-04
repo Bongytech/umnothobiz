@@ -90,6 +90,17 @@ beforeEach(async () => {
       createdAt: new Date(),
     });
     await setDoc(doc(db, 'barterItems', 'item1'), ITEM);
+    await setDoc(doc(db, 'payments', 'pay1'), {
+      ownerId: 'buyer',
+      plan: 'basic',
+      amountZar: 49,
+      amountUsdt: 2.65,
+      status: 'pending',
+      provider: 'sandbox',
+      providerPaymentId: 'sandbox_pay1',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 60_000),
+    });
   });
 });
 
@@ -251,6 +262,34 @@ describe('activeBids', () => {
 
     const buyerDb = testEnv.authenticatedContext('buyer').firestore();
     await assertSucceeds(deleteDoc(doc(buyerDb, 'activeBids', 'bid1')));
+  });
+});
+
+describe('payments', () => {
+  it('lets only the owner read a payment', async () => {
+    const buyerDb = testEnv.authenticatedContext('buyer').firestore();
+    const ownerDb = testEnv.authenticatedContext('owner').firestore();
+    const outsiderDb = testEnv.authenticatedContext('outsider').firestore();
+
+    await assertSucceeds(getDoc(doc(buyerDb, 'payments', 'pay1')));
+    await assertFails(getDoc(doc(ownerDb, 'payments', 'pay1')));
+    await assertFails(getDoc(doc(outsiderDb, 'payments', 'pay1')));
+  });
+
+  it('never lets a client create, update, or delete a payment', async () => {
+    const buyerDb = testEnv.authenticatedContext('buyer').firestore();
+
+    await assertFails(
+      setDoc(doc(buyerDb, 'payments', 'pay2'), {
+        ownerId: 'buyer',
+        plan: 'basic',
+        amountZar: 49,
+        status: 'paid',
+        createdAt: new Date(),
+      }),
+    );
+    await assertFails(updateDoc(doc(buyerDb, 'payments', 'pay1'), { status: 'paid' }));
+    await assertFails(deleteDoc(doc(buyerDb, 'payments', 'pay1')));
   });
 });
 

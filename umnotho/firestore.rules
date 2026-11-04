@@ -213,6 +213,14 @@ service cloud.firestore {
       }
     }
 
+    // ------------------------------------------------------------ payments
+    // Payment documents are created and settled only by trusted Cloud
+    // Functions. Clients can read their own payment for the checkout screen.
+    match /payments/{paymentId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow write: if false;
+    }
+
     // Every other path is denied by default.
   }
 }

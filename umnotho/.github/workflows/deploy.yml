@@ -1,4 +1,4 @@
-name: Deploy to Firebase Hosting
+name: Deploy to Firebase
 
 on:
   push:
@@ -42,19 +42,34 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
         run: npm run build
 
-      # Do not fail every push to main while the Firebase service account is
-      # not configured yet. Set FIREBASE_SERVICE_ACCOUNT to enable deploys.
+      # Do not fail every push to main while Firebase credentials are not
+      # configured yet. Set both secrets to enable deploys.
       - name: Check deployment credentials
         id: credentials
         env:
           SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
         run: |
-          if [ -z "$SERVICE_ACCOUNT" ]; then
+          if [ -z "$SERVICE_ACCOUNT" ] || [ -z "$PROJECT_ID" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::FIREBASE_SERVICE_ACCOUNT is not set; skipping deployment."
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT or VITE_FIREBASE_PROJECT_ID is missing; skipping deployment."
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Install Cloud Functions dependencies
+        if: steps.credentials.outputs.ready == 'true'
+        run: npm --prefix functions ci --no-audit --no-fund
+
+      - name: Deploy Cloud Functions
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
+          npx --yes firebase-tools@15 deploy --only functions --project "$PROJECT_ID" --non-interactive
 
       - name: Deploy to Firebase Hosting
         if: steps.credentials.outputs.ready == 'true'

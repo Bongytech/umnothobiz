@@ -7,6 +7,7 @@ dist-ssr/
 build/
 coverage/
 *.tsbuildinfo
+functions/lib/
 
 # Local environment files (never commit real Firebase keys)
 .env

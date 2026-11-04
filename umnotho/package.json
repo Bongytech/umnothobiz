@@ -19,10 +19,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rules": "npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-umnotho \"node node_modules/vitest/vitest.mjs run --config vitest.rules.config.ts\"",
+    "functions:install": "npm --prefix functions install",
+    "functions:build": "npm --prefix functions run build",
+    "functions:test": "npm --prefix functions test",
+    "emulators": "npm --prefix functions run build && npx --yes firebase-tools@15 emulators:start --only auth,firestore,functions --project demo-umnotho",
     "security": "npm run lint && npm audit --omit=dev --audit-level=high",
     "security:all": "npm run lint && npm audit --audit-level=high",
     "security:report": "node scripts/security-monitor.js",
-    "deploy": "npm run build && npx --yes firebase-tools@15 deploy --only hosting"
+    "deploy:hosting": "npm run build && npx --yes firebase-tools@15 deploy --only hosting",
+    "deploy": "npm run build && npm --prefix functions run build && npx --yes firebase-tools@15 deploy --only hosting,functions"
   },
   "dependencies": {
     "firebase": "^12.19.0",

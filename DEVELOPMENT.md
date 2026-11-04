@@ -8,7 +8,7 @@ This guide covers the app in `umnotho/`. For the product overview, start with
 - Node.js 20.19+ and npm 10+
 - Git
 - A Firebase project (for real auth/Firestore) **or** the Firebase emulators
-- Java 11+ if you want to run Firestore rules tests locally
+- Java 11+ for the Firestore emulator (rules tests and the full sandbox)
 
 ## First run
 
@@ -18,6 +18,15 @@ cd umnothobiz/umnotho
 npm install
 npm run setup:env   # or: cp .env.example .env.local, then edit it
 npm run dev
+```
+
+For the crypto sandbox, also install Functions dependencies:
+
+```bash
+npm run functions:install
+npm run setup:env -- --emulator --force
+npm run emulators       # auth, Firestore, Functions; needs Java
+npm run dev             # another terminal
 ```
 
 On PowerShell, use `Copy-Item .env.example .env.local`.
@@ -42,12 +51,34 @@ On PowerShell, use `Copy-Item .env.example .env.local`.
 These are identifiers, not server secrets, but keep per-environment files out of
 git. `.gitignore` ignores `.env` and `.env.*` except `.env.example`.
 
+### Cloud Functions environment
+
+Set these in `functions/.env.local` for the emulator, or as Firebase Functions
+config/secrets in production. They are **never** committed.
+
+| Variable | Purpose |
+| :--- | :--- |
+| `CRYPTO_PROVIDER` | Provider id (`sandbox` only in emulator; real adapter id in production) |
+| `ALLOW_SANDBOX_PAYMENTS` | Must be `true` only for local sandbox; never in production |
+| `SANDBOX_ZAR_PER_USDT` | Sandbox quote rate, e.g. `18.50` |
+| `SANDBOX_USDT_ADDRESS` | Sandbox display address |
+| `SANDBOX_NETWORK` | Sandbox network label |
+| `SANDBOX_WEBHOOK_SECRET` | HMAC secret for the sandbox webhook |
+
+`FUNCTIONS_EMULATOR=true` is set automatically by the emulator and enables the
+sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout.
+
 ## Commands
 
 | Command | Description |
 | :--- | :--- |
 | `npm run dev` | Vite dev server |
 | `npm run setup:env` | Write `.env.local` from the live demo’s public Firebase config |
+| `npm run setup:env -- --emulator` | Write dummy `.env.local` for the emulators |
+| `npm run functions:install` | Install Cloud Functions dependencies |
+| `npm run functions:build` | Compile Cloud Functions |
+| `npm run functions:test` | Cloud Functions unit tests |
+| `npm run emulators` | Start Auth, Firestore and Functions emulators |
 | `npm run build` | Typecheck + production build |
 | `npm run typecheck` | TypeScript only |
 | `npm run lint` | ESLint (zero warnings) |
@@ -58,7 +89,8 @@ git. `.gitignore` ignores `.env` and `.env.*` except `.env.example`.
 | `npm run security:all` | Lint + full audit including dev tooling |
 | `npm run security:report` | Write a local security report |
 | `npm run preview` | Preview the build |
-| `npm run deploy` | Build + deploy hosting |
+| `npm run deploy:hosting` | Build + deploy Hosting only |
+| `npm run deploy` | Build + deploy Hosting + Cloud Functions |
 
 ## Architecture
 
@@ -72,17 +104,29 @@ src/
 │   ├── Auth.tsx            # Email/password + Google
 │   ├── Barter.tsx          # Listings, questions, votes, offer modal
 │   ├── MyBids.tsx          # Received/placed offers + messaging + ratings
-│   ├── Profile.tsx         # Public profile and received-rating average
-│   ├── Pricing.tsx         # Display-only pricing (demo)
+│   ├── Profile.tsx         # Public profile, rating average, current plan
+│   ├── Pricing.tsx         # Plans + crypto checkout modal
 │   └── RouteGuards.tsx     # ProtectedRoute / PublicOnlyRoute
 ├── lib/
-│   ├── firebase.ts         # Single initializeApp, auth, db, emulators
+│   ├── firebase.ts         # Single initializeApp, auth, db, functions, emulators
+│   ├── crypto.ts           # Checkout response types and formatting
 │   ├── types.ts            # Domain types
 │   ├── validation.ts       # Pure listing/offer/message validation
 │   ├── votes.ts            # Vote summaries and one-vote rule
 │   ├── bids.ts             # Roles and status transitions
 │   └── user.ts             # Rule-safe display names
 └── index.css               # Tailwind theme tokens
+
+functions/
+├── src/
+│   ├── index.ts            # Callable functions + webhook
+│   ├── payments.ts         # Checkout creation, settlement, plan activation
+│   ├── plans.ts            # Server-side ZAR plan catalogue
+│   ├── provider.ts         # Provider resolution and sandbox guards
+│   ├── providers/          # Sandbox adapter + PaymentProvider interface
+│   ├── admin.ts            # Single firebase-admin initialisation
+│   └── core.ts             # Pure quote/signature/status logic
+└── tsconfig.json
 ```
 
 ### Rules of thumb
@@ -140,6 +184,25 @@ Create `activeBids/{id}` with a snapshot of the listing and `status: 'Pending'`.
 The rules verify that `itemId` exists and that its owner matches `ownerId`. Both
 participants can append messages; only the owner changes status.
 
+## Crypto payments
+
+Phase 1 covers Basic/Biz subscriptions. Read
+[docs/crypto-payments.md](./docs/crypto-payments.md) for the full architecture,
+provider adapter contract, and production checklist.
+
+Key invariants:
+
+- Plan prices and durations live in `functions/src/plans.ts`; the browser sends
+  only a plan id.
+- `createCryptoCheckout` locks the ZAR→USDT quote and creates `payments/{id}`.
+- Only the webhook or the local sandbox confirmation can call `settlePayment()`;
+  it is idempotent and activates the plan in the same transaction.
+- `payments` is read-own, write-never in `firestore.rules`.
+- `confirmSandboxPayment` is disabled unless the Functions emulator or
+  `ALLOW_SANDBOX_PAYMENTS=true` is active. Never enable it in production.
+- There are no private keys in the frontend or repository. A real provider must
+  verify its own webhook signature and amount.
+
 ## Firestore rules and indexes
 
 - Rules live in `firestore.rules`; they are the authorization boundary.
@@ -165,27 +228,33 @@ participants can append messages; only the owner changes status.
 ## Testing
 
 - Unit tests live next to the code as `*.test.ts` in `src/lib/`.
+- Cloud Functions tests live in `functions/src/*.test.ts`.
 - Rules tests live in `tests/rules/`.
 - `npm test` does **not** start an emulator, so it is fast and works offline.
 - Add a unit test for pure logic and a rules test for any new authorization path.
+- Crypto flow end-to-end: `npm run emulators`, `npm run dev`, sign in with any
+  emulator account, then Pricing → Pay with USDT → simulate payment.
 
 ## CI and deployment
 
-`.github/workflows/ci.yml` runs lint, typecheck, unit tests, build and rules
-tests. `.github/workflows/deploy.yml` deploys hosting on `main` when
-`FIREBASE_SERVICE_ACCOUNT` is set.
+`.github/workflows/ci.yml` runs lint, typecheck, unit tests, build, Functions
+tests/build and rules tests. `.github/workflows/deploy.yml` deploys hosting and
+Cloud Functions on `main` when `FIREBASE_SERVICE_ACCOUNT` is set.
 
 Deployment secrets:
 
 | Secret | Used for |
 | :--- | :--- |
-| `FIREBASE_SERVICE_ACCOUNT` | Hosting deploy authentication |
+| `FIREBASE_SERVICE_ACCOUNT` | Hosting + Functions deploy authentication |
 | `VITE_FIREBASE_API_KEY` | Build-time Firebase config |
 | `VITE_FIREBASE_AUTH_DOMAIN` | Build-time Firebase config |
-| `VITE_FIREBASE_PROJECT_ID` | Build-time config + hosting project |
+| `VITE_FIREBASE_PROJECT_ID` | Build-time config + deploying project |
 | `VITE_FIREBASE_STORAGE_BUCKET` | Build-time config |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build-time config |
 | `VITE_FIREBASE_APP_ID` | Build-time config |
+
+Cloud Functions runtime is Node 22 (`functions/package.json`). Never commit the
+service-account JSON; keep it in the GitHub secret only.
 
 ## Troubleshooting
 
@@ -198,6 +267,9 @@ Deployment secrets:
 | Google sign-in popup closes | Domain not in Firebase Auth authorized domains, or popup blocked (the app falls back to redirect) |
 | Rules tests cannot connect | Emulator not running or port 8080 is in use; `npm run test:rules` starts it for you |
 | Rules tests fail to start | Java is not installed or not on `PATH` |
+| Pricing says crypto checkout is unavailable | Cloud Functions are not deployed or emulated; run `npm run emulators` or deploy Functions |
+| Functions emulator fails to load | Run `npm run functions:build`; check `firebase-debug.log` and that `functions/package.json` main points at `lib/index.js` |
+| `permission-denied` confirming sandbox payment | `ALLOW_SANDBOX_PAYMENTS`/emulator guard is off, or the payment is expired |
 
 ## Commit style
 

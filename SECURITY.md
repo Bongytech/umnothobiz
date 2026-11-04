@@ -60,6 +60,49 @@ The full source is [umnotho/firestore.rules](./umnotho/firestore.rules).
   - either participant may append a message with their own UID and a bounded
     length;
   - either participant may delete the bid (withdraw/decline).
+- **Payments**
+  - `payments/{id}` is readable only by its owner;
+  - clients cannot create, update, or delete payment documents — only the Admin
+    SDK inside Cloud Functions can;
+  - plan prices, durations, and the ZAR→USDT quote are chosen server-side;
+  - a plan is activated only by the settlement transaction after a verified
+    webhook (or the explicitly local sandbox confirmation);
+  - `subscriptionTier` and related fields remain server-written only.
+
+## Crypto payments
+
+Phase 1 is a **sandbox** integration. Full details are in
+[docs/crypto-payments.md](./docs/crypto-payments.md).
+
+- There are no private keys, seed phrases, or service-account credentials in the
+  app, the functions source, or this repository.
+- The checkout uses a provider adapter. The sandbox adapter only works when the
+  Functions emulator is running; a deployed function with no `CRYPTO_PROVIDER`
+  refuses to create a checkout.
+- `confirmSandboxPayment` is disabled unless `FUNCTIONS_EMULATOR=true` or
+  `ALLOW_SANDBOX_PAYMENTS=true`. The latter must never be set in production.
+- Real providers must verify their webhook signature over the raw body. The
+  settlement transaction is idempotent and rejects an amount mismatch when the
+  provider supplies `amountUsdt`.
+- Adding a real provider requires a business account, webhook secret, and
+  compliance review. Do not put provider API secrets in Vite variables — anything
+  prefixed `VITE_` ships to the browser.
+
+## Public repository rules
+
+This repository is public. Therefore:
+
+- Never commit `.env`, `.env.local`, `functions/.env*`, service-account JSON,
+  provider API keys, wallet private keys, seed phrases, or webhook secrets.
+- Firebase **web** config values (`VITE_FIREBASE_*`) are public identifiers that
+  ship in the browser bundle; they are not authorization. Do not treat them as
+  secrets, but still keep per-environment files out of git.
+- Deployment credentials belong in GitHub Actions secrets
+  (`FIREBASE_SERVICE_ACCOUNT`) or Firebase Functions secrets, never in code.
+- If a secret is ever committed, rotate it immediately and purge it from git
+  history; deleting the file in a new commit is not enough.
+- Restrict the Firebase web API key by HTTP referrer/API in Google Cloud, enable
+  App Check, and use least-privilege IAM for the deploy service account.
 
 ## Known limitations
 
@@ -72,8 +115,12 @@ These are deliberate gaps in a demo, not unnoticed bugs:
   rating for any other user once. A production system needs a trusted backend or
   Cloud Function to validate the trade.
 - **No email-verification gate.** Accounts are usable immediately after signup.
-- **Paid plans are display-only.** No payment data is collected and no client can
-  grant itself a plan.
+- **Crypto checkout is sandbox-only.** No real provider is configured, no real
+  funds are collected, and the sandbox confirmation path must remain disabled in
+  production. A real launch needs a provider, webhook secret, KYC/AML review,
+  refunds, and accounting.
+- **No payment rate limiting.** A signed-in user can create multiple pending
+  sandbox checkouts; add per-UID rate limiting before launch.
 - **No moderation or admin tooling.** Abusive content must be handled manually in
   the Firebase console.
 - **No image/file storage.** The Storage integration is not enabled.
@@ -88,22 +135,25 @@ These are deliberate gaps in a demo, not unnoticed bugs:
   (`npm audit --omit=dev --audit-level=high`); `npm run security:all` also
   includes dev-tool advisories. The application's production dependency tree
   currently audits clean; the remaining advisories are in development tooling.
-- `.env*` files are ignored except `.env.example`; service-account JSON is
-  ignored.
+- `.env*` files are ignored except `.env.example`; service-account JSON,
+  `functions/.env*`, and `functions/lib` are ignored.
 - GitHub Actions uses npm with a committed lockfile and least-privilege
-  permissions.
+  permissions; deployment secrets are referenced only through `secrets.*`.
+- `firestore.rules` uses deny-by-default and is covered by emulator tests,
+  including payment access.
 - Secret scanning can be enabled with GitHub's own secret scanning or a gitleaks
   pre-commit hook; the old ad-hoc workflow files were removed because they
   referenced a non-existent `functions/` directory.
 
 ## Hardening ideas for a real deployment
 
-1. Move ratings, reputation, plan changes and payment webhooks to trusted Cloud
-   Functions.
+1. Add a real provider adapter with signed webhooks, amount/asset/network
+   validation, and reconciliation.
 2. Add App Check to reduce scripted abuse.
-3. Add rate limiting at the callable-function or API-gateway layer.
+3. Add per-UID rate limiting on checkout creation and webhook processing.
 4. Add email verification and, for business accounts, KYB checks.
-5. Add automated backup/export and an incident-response runbook.
-6. Add dependency and container scanning (Dependabot is already configured).
+5. Add refunds, receipts, tax/VAT reporting, and a payment support process.
+6. Add automated backup/export and an incident-response runbook.
+7. Add dependency and container scanning (Dependabot is already configured).
 
-Last reviewed: 2026-11-03.
+Last reviewed: 2026-11-04.

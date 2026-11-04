@@ -75,6 +75,11 @@ git clone https://github.com/Bongytech/umnothobiz.git
 cd umnothobiz/umnotho
 
 npm install
+
+# Option A (fastest): pull the public web config from the live demo
+npm run setup:env
+
+# Option B: start from the template and paste your own project's values
 cp .env.example .env.local   # Windows: copy .env.example .env.local
 ```
 
@@ -86,6 +91,18 @@ npm run dev
 ```
 
 The app is served at the URL Vite prints (usually `http://localhost:5173`).
+
+### If the page is blank
+
+The most common cause is a missing or unedited `.env.local`. Umnotho now renders
+a **“Firebase is not configured”** screen that lists the exact variables that
+are missing, instead of showing a blank page. Also make sure you run `npm run dev`
+from the `umnotho/` folder (not the repository root) and open the URL Vite prints,
+not the `index.html` file directly.
+
+If you copied `.env.example` without replacing the placeholders, the same screen
+will appear. Paste the real values from Firebase console → Project settings →
+Your apps → Web app, then restart the dev server.
 
 ### Firebase setup
 
@@ -125,6 +142,7 @@ Run these from the `umnotho/` directory.
 | Command | What it does |
 | :--- | :--- |
 | `npm run dev` | Vite dev server with HMR |
+| `npm run setup:env` | Write `.env.local` from the public config of the live demo |
 | `npm run build` | Typecheck and build the production bundle into `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run typecheck` | `tsc -b` without emitting |

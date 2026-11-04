@@ -16,7 +16,7 @@ This guide covers the app in `umnotho/`. For the product overview, start with
 git clone https://github.com/Bongytech/umnothobiz.git
 cd umnothobiz/umnotho
 npm install
-cp .env.example .env.local
+npm run setup:env   # or: cp .env.example .env.local, then edit it
 npm run dev
 ```
 
@@ -47,6 +47,7 @@ git. `.gitignore` ignores `.env` and `.env.*` except `.env.example`.
 | Command | Description |
 | :--- | :--- |
 | `npm run dev` | Vite dev server |
+| `npm run setup:env` | Write `.env.local` from the live demo’s public Firebase config |
 | `npm run build` | Typecheck + production build |
 | `npm run typecheck` | TypeScript only |
 | `npm run lint` | ESLint (zero warnings) |
@@ -190,7 +191,8 @@ Deployment secrets:
 
 | Symptom | Likely cause |
 | :--- | :--- |
-| “Firebase is not configured” on load | `.env.local` missing or variable names typo’d |
+| Blank page with no error overlay | `.env.local` missing or still contains the `.env.example` placeholders; the app should now show a “Firebase is not configured” screen listing the missing keys. Run `npm run dev` from `umnotho/` and open the Vite URL, not `index.html`. |
+| “Firebase is not configured” on load | `.env.local` missing, empty, or has typo’d/placeholder variable values |
 | `permission-denied` when creating a listing | Not signed in, wrong `ownerId`, or a field not allowed by the rules |
 | `failed-precondition` on placing an offer | Index not deployed; run `firebase deploy --only firestore:indexes` |
 | Google sign-in popup closes | Domain not in Firebase Auth authorized domains, or popup blocked (the app falls back to redirect) |

@@ -80,11 +80,14 @@ export default [
 
   // NODE SCRIPTS
   {
-    files: ['scripts/**/*.js'],
+    files: ['scripts/**/*.{js,mjs}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      globals: globals.node,
+      globals: {
+        ...globals.node,
+        fetch: 'readonly',
+      },
     },
     rules: {
       'no-unused-vars': ['error', { caughtErrors: 'none' }],

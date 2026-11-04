@@ -329,6 +329,22 @@ environment to the real domain and deployed webhook URL.
 | `failed-precondition` starting checkout | Email verification is required (`REQUIRE_VERIFIED_EMAIL=true`), or NOWPayments is not configured |
 | NOWPayments webhook 400 | Wrong `x-nowpayments-sig`, missing `order_id`, or `CRYPTO_WEBHOOK_URL` mismatch |
 
+### Windows: esbuild “Access is denied” during build
+
+If `npm run build` fails with `[vite:esbuild-transpile] remove ...esbuild-...: Access is denied`, the
+workspace was marked with the Windows **Low** integrity label (often after a sandboxed run).
+The esbuild executable cannot then delete its temp files. Raise the executable and its parent
+directories to Medium, then rebuild:
+
+```powershell
+icacls "node_modules\@esbuild" /setintegritylevel "(OI)(CI)Medium"
+icacls "node_modules\@esbuild\win32-x64" /setintegritylevel "(OI)(CI)Medium"
+icacls "node_modules\@esbuild\win32-x64\esbuild.exe" /setintegritylevel Medium
+npm run build
+```
+
+Run this again after a fresh `npm ci` if the workspace itself still has the Low label.
+
 ## Commit style
 
 Use short, imperative commits, for example:

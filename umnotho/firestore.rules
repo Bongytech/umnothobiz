@@ -1,48 +1,226 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // USERS COLLECTION
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isText(value, minLength, maxLength) {
+      return value is string
+        && value.size() >= minLength
+        && value.size() <= maxLength;
+    }
+
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function listedItemOwner(itemId) {
+      let item = get(/databases/$(database)/documents/barterItems/$(itemId)).data;
+      return ('ownerId' in item) ? item.ownerId : item.owner;
+    }
+
+    // A rating is a one-time map entry written on the rated user's document.
+    // Nobody can overwrite an existing rating or change another field.
+    function isRatingAppend(targetId) {
+      let newRatings = request.resource.data.get('ratings', {});
+      let oldRatings = resource.data.get('ratings', {});
+      return signedIn()
+        && request.auth.uid != targetId
+        && onlyChanged(['ratings'])
+        && request.auth.uid in newRatings
+        && newRatings[request.auth.uid] is number
+        && newRatings[request.auth.uid] >= 1
+        && newRatings[request.auth.uid] <= 5
+        && newRatings.diff(oldRatings).affectedKeys().hasOnly([request.auth.uid])
+        && !(request.auth.uid in oldRatings);
+    }
+
+    // ---------------------------------------------------------------- users
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn();
+
+      allow create: if isSelf(userId)
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'ratings', 'createdAt'])
+        && isText(request.resource.data.displayName, 1, 60)
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 320
+        && request.resource.data.ratings is map
+        && request.resource.data.ratings.size() == 0
+        && request.resource.data.createdAt is timestamp;
+
+      // A user can edit their own public fields. Other signed-in users can
+      // only add their own one-time rating; reputation is derived, never
+      // written directly by a client.
+      allow update: if (isSelf(userId)
+          && onlyChanged(['displayName', 'photoURL', 'updatedAt'])
+          && isText(request.resource.data.displayName, 1, 60))
+        || isRatingAppend(userId);
+
       allow delete: if false;
     }
-    
-    // BARTER ITEMS
+
+    // --------------------------------------------------------- barterItems
     match /barterItems/{itemId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.owner;
-      
-      match /votes/{voteId} {
-        allow read: if true;
-        allow create: if request.auth != null 
-          && request.auth.uid == request.resource.data.userId;
-        allow update, delete: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'ownerId', 'ownerName', 'name', 'description', 'estimatedValue',
+          'city', 'type', 'isBusinessBid', 'inquiries', 'votes', 'createdAt'
+        ])
+        && isText(request.resource.data.ownerName, 1, 60)
+        && isText(request.resource.data.name, 3, 80)
+        && isText(request.resource.data.description, 10, 1000)
+        && request.resource.data.estimatedValue is number
+        && request.resource.data.estimatedValue > 0
+        && request.resource.data.estimatedValue <= 10000000
+        && isText(request.resource.data.city, 2, 60)
+        && request.resource.data.type in ['goods', 'service']
+        && request.resource.data.isBusinessBid is bool
+        && request.resource.data.inquiries is list
+        && request.resource.data.inquiries.size() == 0
+        && request.resource.data.votes is map
+        && request.resource.data.votes.size() == 0
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if ownerEdit()
+        || isInquiryAppend()
+        || isVoteAppend();
+
+      allow delete: if signedIn() && currentOwnerId() == request.auth.uid;
+
+      function currentOwnerId() {
+        return ('ownerId' in resource.data) ? resource.data.ownerId : resource.data.owner;
+      }
+
+      function ownerEdit() {
+        return signedIn()
+          && currentOwnerId() == request.auth.uid
+          && onlyChanged(['name', 'description', 'estimatedValue', 'city', 'type', 'isBusinessBid'])
+          && isText(request.resource.data.name, 3, 80)
+          && isText(request.resource.data.description, 10, 1000)
+          && request.resource.data.estimatedValue is number
+          && request.resource.data.estimatedValue > 0
+          && request.resource.data.estimatedValue <= 10000000
+          && isText(request.resource.data.city, 2, 60)
+          && request.resource.data.type in ['goods', 'service']
+          && request.resource.data.isBusinessBid is bool;
+      }
+
+      // Inquiries are append-only so a visitor can ask a question without
+      // being able to edit, delete, or impersonate the listing owner.
+      function isInquiryAppend() {
+        let oldInquiries = resource.data.get('inquiries', []);
+        let newInquiries = request.resource.data.get('inquiries', []);
+        return signedIn()
+          && onlyChanged(['inquiries'])
+          && newInquiries.size() == oldInquiries.size() + 1
+          && newInquiries.size() <= 50
+          && newInquiries[newInquiries.size() - 1].senderId == request.auth.uid
+          && isText(newInquiries[newInquiries.size() - 1].senderName, 1, 60)
+          && isText(newInquiries[newInquiries.size() - 1].message, 1, 1000)
+          && newInquiries[newInquiries.size() - 1].createdAt is timestamp;
+      }
+
+      // One immutable vote per user, stored as a map key so a client can
+      // never overwrite somebody else's vote or the owner's listing.
+      function isVoteAppend() {
+        let oldVotes = resource.data.get('votes', {});
+        let newVotes = request.resource.data.get('votes', {});
+        return signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+          && newVotes.diff(oldVotes).affectedKeys().hasOnly([request.auth.uid])
+          && !(request.auth.uid in oldVotes)
+          && request.auth.uid in newVotes
+          && (newVotes[request.auth.uid] == 'up' || newVotes[request.auth.uid] == 'down')
+          && currentOwnerId() != request.auth.uid;
       }
     }
-    
-    // ACTIVE BIDS
+
+    // ---------------------------------------------------------- activeBids
     match /activeBids/{bidId} {
-      allow read: if request.auth != null && 
-        (request.auth.uid == resource.data.bidderId || 
-         request.auth.uid == resource.data.ownerId);
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-        (request.auth.uid == resource.data.bidderId || 
-         request.auth.uid == resource.data.ownerId);
-      allow delete: if request.auth != null && 
-        (request.auth.uid == resource.data.bidderId || 
-         request.auth.uid == resource.data.ownerId);
+      allow read: if signedIn()
+        && (resource.data.bidderId == request.auth.uid
+          || resource.data.ownerId == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.bidderId == request.auth.uid
+        && request.resource.data.ownerId != request.auth.uid
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.keys().hasOnly([
+          'itemId', 'itemName', 'itemDescription', 'itemValue', 'city', 'type',
+          'isBusinessBid', 'ownerId', 'ownerName', 'bidderId', 'bidderName',
+          'offer', 'status', 'messages', 'createdAt', 'lastUpdated'
+        ])
+        && isText(request.resource.data.itemId, 1, 128)
+        && request.resource.data.itemId.matches('^[A-Za-z0-9_-]+$')
+        && isText(request.resource.data.itemName, 1, 80)
+        && isText(request.resource.data.itemDescription, 1, 1000)
+        && request.resource.data.itemValue is number
+        && request.resource.data.itemValue >= 0
+        && request.resource.data.itemValue <= 10000000
+        && isText(request.resource.data.city, 0, 60)
+        && request.resource.data.type in ['goods', 'service']
+        && request.resource.data.isBusinessBid is bool
+        && isText(request.resource.data.ownerName, 1, 60)
+        && isText(request.resource.data.bidderName, 1, 60)
+        && isText(request.resource.data.offer, 5, 1000)
+        && request.resource.data.messages is list
+        && request.resource.data.messages.size() == 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.lastUpdated is timestamp
+        && listedItemOwner(request.resource.data.itemId) == request.resource.data.ownerId;
+
+      allow update: if signedIn()
+        && isBidParticipant()
+        && (isMessageAppend() || isOwnerStatusChange());
+
+      allow delete: if signedIn()
+        && (resource.data.bidderId == request.auth.uid
+          || resource.data.ownerId == request.auth.uid);
+
+      function isBidParticipant() {
+        return resource.data.bidderId == request.auth.uid
+          || resource.data.ownerId == request.auth.uid;
+      }
+
+      function isMessageAppend() {
+        let oldMessages = resource.data.get('messages', []);
+        let newMessages = request.resource.data.get('messages', []);
+        return onlyChanged(['messages', 'lastUpdated'])
+          && newMessages.size() == oldMessages.size() + 1
+          && newMessages.size() <= 200
+          && newMessages[newMessages.size() - 1].senderId == request.auth.uid
+          && isText(newMessages[newMessages.size() - 1].senderName, 1, 60)
+          && isText(newMessages[newMessages.size() - 1].content, 1, 1000)
+          && newMessages[newMessages.size() - 1].createdAt is timestamp;
+      }
+
+      function isOwnerStatusChange() {
+        let oldStatus = resource.data.get('status', 'Pending');
+        return resource.data.ownerId == request.auth.uid
+          && oldStatus != 'Completed'
+          && oldStatus != 'Declined'
+          && request.resource.data.status in ['In Negotiation', 'Completed', 'Declined']
+          && onlyChanged(['status', 'lastUpdated']);
+      }
     }
-    
-    // BID ITEMS (backward compatibility)
-    match /bidItems/{bidId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.bidderId;
+
+    // ------------------------------------------------------------ payments
+    // Payment documents are created and settled only by trusted Cloud
+    // Functions. Clients can read their own payment for the checkout screen.
+    match /payments/{paymentId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow write: if false;
     }
+
+    // Every other path is denied by default.
   }
 }

@@ -17,6 +17,8 @@ export default [
       '*.log',
       'coverage/**',
       '.firebase/**',
+      'functions/lib/**',
+      'functions/node_modules/**',
       'security-check.js'
     ]
   },
@@ -46,7 +48,7 @@ export default [
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
         'warn',
-        { allowConstantExport: true },
+        { allowConstantExport: true, allowExportNames: ['useAuth'] },
       ],
       
       // Security rules - adjusted for React/TypeScript
@@ -76,5 +78,39 @@ export default [
         'varsIgnorePattern': '^_'
       }]
     }
+  },
+
+  // NODE SCRIPTS
+  {
+    files: ['scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        fetch: 'readonly',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { caughtErrors: 'none' }],
+    },
+  },
+
+  // CLOUD FUNCTIONS RUN IN NODE
+  {
+    files: ['functions/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+
+  // VITEST CONFIG AND RULES TESTS RUN IN NODE
+  {
+    files: ['tests/**/*.ts', 'vitest.config.ts', 'vitest.rules.config.ts', 'vite.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
   }
 ];

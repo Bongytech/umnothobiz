@@ -1,209 +1,297 @@
-# 🔐 UMNOTHO - Peer-to-Peer Barter Platform
-## 🌐 Live Demo
+# Umnotho — trade without money
 
-Try out the live application: [**UMNOTHO Live Demo**](https://umnothobiz.web.app/)
-## ✨ Features
+<p align="center">
+  <img src="./umnotho/src/assets/Umnotho2.png" alt="Umnotho logo" width="167" height="116" />
+</p>
 
-### 🛡️ **Security Features**
-- **Authentication:** Secure user authentication with Firebase
-- **Data Protection:** Encrypted data storage and secure API communication
-- **Audit Logging:** Activity tracking for user actions
-- **Authorization:** User role and permission management
+[![CI](https://github.com/Bongytech/umnothobiz/actions/workflows/ci.yml/badge.svg)](https://github.com/Bongytech/umnothobiz/actions/workflows/ci.yml)
 
-### 📊 **Platform Features**
-- **Barter Listings:** Create and browse goods/services for exchange
-- **Bid Management:** Place, negotiate, and manage trade offers
-- **User Messaging:** In-app communication between traders
-- **Reputation System:** Community-based trust scoring
-- **Location-Based Matching:** Find trades based on proximity
+Umnotho is a peer-to-peer barter marketplace. People list goods or services, make
+trade offers, negotiate in a private thread, and rate each other after a trade.
+It is a portfolio project built with React, TypeScript, Vite, Tailwind CSS and
+Firebase.
 
-### 🔌 **Technical Features**
-- **Real-time Updates:** Live data synchronization via Firestore listeners
-- **Responsive Design:** Mobile-friendly interface for all devices
-- **Offline Support:** Basic offline functionality with local caching
-- **Type Safety:** Full TypeScript implementation across the stack
+**Live demo:** [umnothobiz.web.app](https://umnothobiz.web.app/)
+
+> The live site may lag behind `main` until the deployment workflow runs.
 
 ---
 
-## 🚀 Quick Start
+## What works
+
+- **Accounts** — email/password and Google sign-in, with protected routes and a
+  single shared auth context.
+- **Listings** — create, browse, filter by city/type/maximum value, and view your
+  own listings.
+- **Questions** — append-only public questions on each listing.
+- **Offers** — send an offer with a written trade proposal; see offers received
+  and offers placed under **My Bids**.
+- **Negotiation** — private message threads, status changes (pending, in
+  negotiation, completed, declined), and withdrawal of an offer.
+- **Ratings** — one 1–5 star rating per trader per completed trade, shown as an
+  average on the profile.
+- **Crypto subscription checkout** — ZAR-priced Basic/Biz plans paid in USDT via
+  a hosted checkout. NOWPayments is the first live adapter; a sandbox provider is
+  available for local work. A Cloud Function verifies the payment and activates
+  the plan; the browser can never grant a plan.
+- **Security rules** — Firestore rules enforce ownership, participation and
+  append-only writes; see [firestore.rules](./umnotho/firestore.rules).
+
+### Deliberate demo limitations
+
+This is not a production marketplace. In particular:
+
+- **Crypto checkout is disabled until configured.** The NOWPayments adapter is
+  implemented, but live payments require provider secrets, a public webhook URL,
+  and Cloud Functions on Blaze. Without those, the UI reports crypto unavailable
+  or runs the local sandbox. No real funds are collected by default.
+- Barter top-ups and on-chain escrow are planned phases, not implemented.
+- There is no image upload, notification, search index, or admin/moderation
+  console. Email verification is available but only enforced when
+  `REQUIRE_VERIFIED_EMAIL=true`.
+- Ratings are not tied to a verified completed transaction server-side; the UI
+  only offers rating after a completed bid, but a custom client could still rate
+  another user once.
+- There is no SLA, backup policy, refund flow, or compliance certification.
+
+---
+
+## Tech stack
+
+| Layer | Choice |
+| :--- | :--- |
+| UI | React 18, TypeScript, Tailwind CSS 4, Motion, Lucide icons |
+| Build | Vite 6, TypeScript project references |
+| Routing | React Router 7 |
+| Backend | Firebase Authentication + Cloud Firestore + Cloud Functions |
+| Crypto | NOWPayments hosted checkout (USDT), local sandbox fallback |
+| Tests | Vitest, Firebase Rules Unit Testing |
+| CI | GitHub Actions (lint, typecheck, unit tests, build, rules tests) |
+
+---
+
+## Getting started
 
 ### Prerequisites
-- **Node.js:** 18.x or higher
-- **npm:** 9.x or higher
-- **Git:** Latest version
-- **Firebase Account:** For backend services
-- **Browser:** Modern Evergreen Browser (Chrome 90+, Firefox 88+, Safari 14+)
 
-### Installation
+- Node.js **20.19+** (see `engines` in [package.json](./umnotho/package.json))
+- npm 10+
+- A Firebase project
+
+### Run locally
 
 ```bash
-# Clone the repository
 git clone https://github.com/Bongytech/umnothobiz.git
-cd umnotho
+cd umnothobiz/umnotho
 
-# Install dependencies
 npm install
 
-# Set up environment variables
-cp .env.example .env
-# Add your Firebase configuration to .env
+# Option A (fastest): pull the public web config from the live demo
+npm run setup:env
 
-# Start development server
+# Option B: start from the template and paste your own project's values
+cp .env.example .env.local   # Windows: copy .env.example .env.local
+```
+
+Fill in `.env.local` from **Firebase console → Project settings → Your apps → Web
+app → SDK setup**. Then:
+
+```bash
 npm run dev
 ```
 
-### Available Scripts
+The app is served at the URL Vite prints (usually `http://localhost:5173`).
 
-| Command | Description |
-| :--- | :--- |
-| `npm run dev` | Start development server |
-| `npm run build` | Build the application for production |
-| `npm run preview` | Preview the production build locally |
-| `npm run test` | Run test suite |
-| `npm run lint` | Run code quality checks |
+### If the page is blank
 
----
+The most common cause is a missing or unedited `.env.local`. Umnotho now renders
+a **“Firebase is not configured”** screen that lists the exact variables that
+are missing, instead of showing a blank page. Also make sure you run `npm run dev`
+from the `umnotho/` folder (not the repository root) and open the URL Vite prints,
+not the `index.html` file directly.
 
-## 🏗️ Architecture
+If you copied `.env.example` without replacing the placeholders, the same screen
+will appear. Paste the real values from Firebase console → Project settings →
+Your apps → Web app, then restart the dev server.
 
-### Tech Stack
-- **Frontend:** React 18 + TypeScript
-- **State Management:** React Context API + Custom Hooks
-- **Routing:** React Router v6
-- **Styling:** CSS Modules / Styled Components
-- **Backend:** Firebase (Firestore, Authentication, Storage)
-- **Real-time Communication:** Firestore listeners
-- **API Communication:** Firebase SDK + Custom API calls
+### Firebase setup
 
-### Key Integrations
-- **Firebase Firestore:** Real-time database and data storage
-- **Firebase Authentication:** User management and security
-- **Firebase Storage:** File and image uploads
-- **Firebase Hosting:** Application deployment
+1. Create a Firebase project and a **Web app**.
+2. Enable **Email/Password** and **Google** under Authentication → Sign-in method.
+3. Create a **Firestore** database.
+4. Deploy the rules and indexes:
 
----
+   ```bash
+   firebase login
+   firebase use --add            # select your project
+   firebase deploy --only firestore:rules,firestore:indexes
+   ```
 
-## 🔧 Development
+5. Add `localhost` and your production domain under Authentication → Settings →
+   Authorized domains.
 
-For detailed development guidelines, see our [Developer Documentation](./DEVELOPMENT.md).
+The Firebase web config values are identifiers, not server secrets. Data access
+is controlled by `firestore.rules`, not by hiding the config.
 
-### Development Workflow
-1. **Fork** the repository.
-2. **Clone** your fork.
-3. **Branch** from `main` (`git checkout -b feature/amazing-feature`).
-4. **Code** with accompanying tests.
-5. **Test** your changes locally.
-6. **Push** to your fork.
-7. **PR** to the upstream repository.
+### Optional: run the crypto sandbox end-to-end
 
-### Code Standards
-- TypeScript for all new code
-- ESLint for code quality
-- Prettier for consistent formatting
-- Meaningful commit messages
-- Regular dependency updates
-
----
-
-## 🔒 Security
-
-Security is important. For comprehensive security information, see our [Security Documentation](./SECURITY.md).
-
-### Current Security Features
-- ✅ Firebase Authentication with email verification
-- ✅ Firestore Security Rules for data protection
-- ✅ Input validation and sanitization
-- ✅ Secure API key management
-- ✅ Regular dependency updates
-
-### Reporting Security Issues
-Found a security vulnerability? Please **do not** open a public issue. Report it responsibly via email.
-
----
-
-## 🧪 Testing
+The crypto checkout needs Cloud Functions. For a completely local, no-real-money
+run:
 
 ```bash
-# Run tests
-npm run test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run linting checks
-npm run lint
+npm run functions:install
+npm run setup:env -- --emulator --force
+npm run emulators        # auth, Firestore and Functions; needs Java
+# in another terminal
+npm run dev
 ```
 
-- **Unit Tests:** React Testing Library
-- **Integration Tests:** Manual testing with Firebase Emulator
-- **Security Checks:** Basic vulnerability scanning
+Use any email/password on the Auth emulator screen, then open **Pricing** and pay
+with the sandbox button. No real funds move.
+
+For live NOWPayments configuration, see
+[docs/crypto-payments.md](./docs/crypto-payments.md). Never commit the provider
+keys or webhook secret.
+
+### Optional: run against the emulators without crypto
+
+```bash
+firebase emulators:start --only auth,firestore
+# in another terminal
+VITE_USE_FIREBASE_EMULATORS=true npm run dev
+```
+
+The emulator UI is available at `http://localhost:4000` by default.
 
 ---
 
-## 📚 Documentation
+## Commands
 
-### Project Documentation
-- [Setup Guide](./docs/setup.md) - Getting started instructions
-- [Firebase Configuration](./docs/firebase.md) - Backend setup
-- [Data Models](./docs/models.md) - Database structure
-- [API Reference](./docs/api.md) - Available endpoints
+Run these from the `umnotho/` directory.
 
-### Quick Links
-- [Contributing Guidelines](./CONTRIBUTING.md)
-- [Code of Conduct](./CODE_OF_CONDUCT.md)
-- [License](./LICENSE.md)
+| Command | What it does |
+| :--- | :--- |
+| `npm run dev` | Vite dev server with HMR |
+| `npm run setup:env` | Write `.env.local` from the public config of the live demo |
+| `npm run setup:env -- --emulator` | Write a dummy `.env.local` for the Firebase emulators |
+| `npm run functions:install` | Install Cloud Functions dependencies |
+| `npm run functions:build` | Compile Cloud Functions |
+| `npm run functions:test` | Run Cloud Functions unit tests |
+| `npm run emulators` | Start Auth, Firestore and Functions emulators |
+| `npm run build` | Typecheck and build the production bundle into `dist/` |
+| `npm run preview` | Serve the production build locally |
+| `npm run typecheck` | `tsc -b` without emitting |
+| `npm run lint` | ESLint with zero warnings allowed |
+| `npm test` | Vitest unit tests |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run test:rules` | Firestore rules tests against the emulator |
+| `npm run security` | Lint plus a production-dependency audit (`npm audit --omit=dev`) |
+| `npm run security:all` | Same, including dev-tool advisories |
+| `npm run deploy:hosting` | Build and deploy Firebase Hosting only |
+| `npm run deploy` | Build and deploy Hosting + Cloud Functions |
 
----
+`test:rules` needs a Java runtime for the Firestore emulator (the Firebase CLI is
+fetched through `npx`):
 
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTING.md) to get started.
-
-- 🐛 **Report bugs** - Open an issue
-- ✨ **Suggest features** - Start a discussion
-- 📝 **Improve docs** - Submit a PR
-- 🔧 **Fix issues** - Check open issues
-
----
-
-## 📄 License & Usage Terms
-
-**UMNOTHO** is released under a **source-available, non-commercial license**. This project is primarily a **portfolio piece and community collaboration experiment**, not a production-ready commercial product.
-
-### ✅ **What you CAN do:**
-- View, study, and learn from the source code
-- Use the software for personal or educational purposes
-- Contribute improvements via pull requests
-- Fork and modify for non-commercial projects
-- Share with others for learning purposes
-
-### ⚠️ **What you CANNOT do without explicit permission:**
-- Use this software for commercial purposes
-- Resell, monetize, or charge for access to this software
-- Offer this software as a paid service (SaaS)
-- Use this software in production environments for business revenue
-- Incorporate into commercial products without written consent
-
-### 🎯 **Project Intent:**
-This is a **portfolio demonstration project** showcasing full-stack development skills with Firebase and React. It's not intended for commercial deployment by third parties. For commercial licensing inquiries, please contact the author directly.
-
-**Legal Note:** For the complete legal terms, please read the full license file. This summary is for convenience only and does not replace the actual license terms.
+```bash
+npm run test:rules
+```
 
 ---
 
-## 🙏 Acknowledgments
+## Project structure
 
-- [React](https://reactjs.org/) for the UI library
-- [TypeScript](https://www.typescriptlang.org/) for type safety
-- [Firebase](https://firebase.google.com/) for backend services
-- [Vite](https://vitejs.dev/) for build tooling
-- All contributors and supporters!
+```text
+umnotho/
+├── src/
+│   ├── components/       # Pages and shared UI (Barter, MyBids, Auth, …)
+│   ├── contexts/         # AuthProvider / useAuth
+│   ├── lib/              # Firebase setup, types, validation, bid/vote/crypto logic
+│   └── main.tsx
+├── functions/            # Cloud Functions: checkout, webhook, plan activation
+│   └── src/
+├── tests/rules/          # Firestore security-rules tests
+├── docs/                 # Crypto-payment architecture and provider guide
+├── firestore.rules       # Server-side authorization
+├── firestore.indexes.json
+├── firebase.json
+└── vite.config.ts
+```
 
-<div align="center">
+---
 
-Made with ❤️ by the **UMNOTHO Team**
+## Data model
 
-[📖 Developer Guide](./DEVELOPMENT.md) • [🔒 Security Guide](./SECURITY.md) • [🐛 Report Bug](mailto:bongytech@gmail.com?subject=Bug%20Report%20-%20UMNOTHO%20Platform) • [✨ Request Feature](mailto:bongytech@gmail.com?subject=Feature%20Request%20-%20UMNOTHO%20Platform)
+| Collection | Purpose | Access |
+| :--- | :--- | :--- |
+| `users/{uid}` | Display name, email, one-time ratings map | Signed-in users can read; owners edit public fields; others may add only their own rating |
+| `barterItems/{id}` | Listing, questions, votes | Public read; owner-only create/edit/delete; anyone signed in may append a question or one vote |
+| `activeBids/{id}` | Offer snapshot, status, private messages | Only the owner and bidder can read/write; owner controls status; both can message |
+| `payments/{id}` | Crypto checkout: plan, ZAR/USDT amount, provider reference, status | Owner can read; only Cloud Functions can create/update/delete |
 
-</div>
+`users/{uid}` also gains server-written `subscriptionTier`, `subscriptionStatus`,
+`subscriptionExpiresAt`, `subscriptionStartedAt` and `lastPaymentId` after a
+verified payment. Clients cannot write those fields.
 
+New listings use `ownerId`; the client also understands the legacy `owner` field
+so older documents continue to work.
+
+---
+
+## Security model
+
+- **Deny by default.** Only the paths above are matched.
+- Listings are created with the signed-in user's `ownerId`; edits and deletes are
+  owner-only.
+- Questions and votes are **append-only**. Votes and ratings are keyed by the
+  author's UID, so one account cannot overwrite another person's data.
+- Bid documents are readable only by the two participants. The owner is the only
+  person who can change the offer status.
+- Clients cannot write `reputation`, `subscriptionTier`, or other privileged
+  fields. Plan activation happens only in a Cloud Function transaction after a
+  verified payment.
+- Payment documents are write-only through the Admin SDK; clients may read their
+  own payment but cannot create one or mark it paid.
+- Checkout creation is rate-limited per account; App Check and email verification
+  can be enforced with `ENFORCE_APP_CHECK=true` and `REQUIRE_VERIFIED_EMAIL=true`.
+- No secrets are committed; `.env*` files are ignored except `.env.example`.
+  Service-account JSON, `functions/.secret.local`, and webhook secrets stay in
+  GitHub/Firebase secrets. This repository is public — see
+  [SECURITY.md](./SECURITY.md) before adding config.
+
+See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
+
+---
+
+## Testing and CI
+
+- **Unit tests** cover validation, vote summaries, bid roles/transitions,
+  display-name handling, and crypto formatting (`src/lib/*.test.ts`).
+- **Cloud Functions tests** cover plan maths, ZAR→USDT quoting, payment statuses,
+  NOWPayments IPN signatures, and provider request shape (`functions/src/*.test.ts`).
+- **Rules tests** start the Firestore emulator and exercise owner, participant,
+  outsider, and payment access (`tests/rules/`).
+- **CI** runs lint, typecheck, unit tests, the production build, Cloud Functions
+  tests/build, and rules tests on every push and pull request.
+- **Deployment** runs on `main` when `FIREBASE_SERVICE_ACCOUNT` is configured;
+  otherwise the deploy step is skipped instead of failing the build. Cloud
+  Functions deploy only when the repository variable `CRYPTO_PROVIDER=nowpayments`
+  is set and the NOWPayments Firebase secrets exist.
+
+---
+
+## Contributing
+
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) and
+[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md). Bug reports and focused pull
+requests are welcome.
+
+## License
+
+Umnotho is source-available for learning and non-commercial use. Commercial use
+requires written permission. See [LICENSE.md](./LICENSE.md) for the full terms.
+
+---
+
+Built by [Bongytech](https://github.com/Bongytech). Questions:
+[bongytech@gmail.com](mailto:bongytech@gmail.com).

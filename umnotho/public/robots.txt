@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /auth
+Disallow: /barter
+Disallow: /my-bids
+Disallow: /profile
+
+Sitemap: https://umnothobiz.web.app/sitemap.xml

@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowRight, ShieldCheck, RefreshCw, Users } from 'lucide-react';
+import { ArrowRight, ShieldCheck, RefreshCw, Star } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-dark-950 text-gray-300 flex flex-col">
@@ -22,10 +24,10 @@ const LandingPage: React.FC = () => {
             Pricing
           </button>
           <button 
-            onClick={() => navigate('/auth')}
+            onClick={() => navigate(user ? '/barter' : '/auth')}
             className="text-sm font-medium px-5 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white"
           >
-            Log in
+            {user ? 'Open market' : 'Log in'}
           </button>
         </div>
       </nav>
@@ -53,10 +55,10 @@ const LandingPage: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button 
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate(user ? '/barter' : '/auth')}
               className="w-full sm:w-auto px-8 py-4 rounded-full bg-umnotho text-dark-950 font-semibold text-lg hover:bg-umnotho-hover transition-all flex items-center justify-center gap-2 group"
             >
-              Start Trading
+              {user ? 'Go to market' : 'Start trading'}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button 
@@ -88,18 +90,20 @@ const LandingPage: React.FC = () => {
             <div className="w-12 h-12 rounded-2xl bg-umnotho/10 flex items-center justify-center mb-6">
               <ShieldCheck className="w-6 h-6 text-umnotho" />
             </div>
-            <h3 className="text-xl font-display font-semibold text-white mb-3">Secure & Trusted</h3>
+            <h3 className="text-xl font-display font-semibold text-white mb-3">Private negotiation</h3>
             <p className="text-gray-400 leading-relaxed">
-              Verified accounts and a robust reputation system ensure you trade with confidence.
+              Offers and messages are visible only to the two traders involved. Discuss the swap
+              without a public bidding war.
             </p>
           </div>
           <div className="p-8 rounded-3xl bg-dark-900 border border-white/5 hover:border-umnotho/30 transition-colors">
             <div className="w-12 h-12 rounded-2xl bg-umnotho/10 flex items-center justify-center mb-6">
-              <Users className="w-6 h-6 text-umnotho" />
+              <Star className="w-6 h-6 text-umnotho" />
             </div>
-            <h3 className="text-xl font-display font-semibold text-white mb-3">Community Powered</h3>
+            <h3 className="text-xl font-display font-semibold text-white mb-3">Community ratings</h3>
             <p className="text-gray-400 leading-relaxed">
-              Connect with locals, build relationships, and empower your community through cashless trading.
+              After a completed trade each side can rate the other once, building a public signal
+              of who is reliable to trade with.
             </p>
           </div>
         </motion.div>

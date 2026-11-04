@@ -1,227 +1,208 @@
-```markdown
-# 👨‍💻 Developer Documentation
+# Developer guide
 
-## 🚀 Getting Started
+This guide covers the app in `umnotho/`. For the product overview, start with
+[README.md](./README.md).
 
-### Prerequisites Checklist
-- [ ] **Node.js 18+** (`node --version`)
-- [ ] **npm 9+** (`npm --version`)
-- [ ] **Git** (`git --version`)
-- [ ] **IDE** (VSCode recommended)
-- [ ] **Docker** (Optional, for containerized development)
+## Prerequisites
 
-### First-Time Setup
+- Node.js 20.19+ and npm 10+
+- Git
+- A Firebase project (for real auth/Firestore) **or** the Firebase emulators
+- Java 11+ if you want to run Firestore rules tests locally
+
+## First run
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Bongytech/umnothobiz.git
-cd umnotho
-
-# 2. Install dependencies
+cd umnothobiz/umnotho
 npm install
-
-# 3. Set up environment
 cp .env.example .env.local
-
-# 4. Start development
 npm run dev
 ```
 
-### Environment Variables
-Create `.env.local` in the root:
+On PowerShell, use `Copy-Item .env.example .env.local`.
 
-```env
-# Application
-VITE_APP_NAME="UMNOTHO"
-VITE_APP_VERSION=1.0.0
-VITE_API_URL=http://localhost:3000/api
+`src/lib/firebase.ts` throws a readable error on startup if any required
+`VITE_FIREBASE_*` value is missing. Fill `.env.local` from the Firebase console:
+**Project settings → Your apps → Web app → SDK setup and configuration**.
 
-# Authentication
-VITE_AUTH_DOMAIN=auth.your-domain.com
-VITE_AUTH_CLIENT_ID=your-client-id
+## Environment variables
 
-# Security (NEVER commit real keys to Git)
-VITE_ENCRYPTION_KEY=your-dev-key-here
-```
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `VITE_FIREBASE_API_KEY` | yes | Web API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | yes | Auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | yes | Project ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | yes | Storage bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | yes | Sender ID |
+| `VITE_FIREBASE_APP_ID` | yes | Web app ID |
+| `VITE_FIREBASE_MEASUREMENT_ID` | no | Analytics measurement ID |
+| `VITE_USE_FIREBASE_EMULATORS` | no | Set to `true` to connect to local emulators |
 
----
+These are identifiers, not server secrets, but keep per-environment files out of
+git. `.gitignore` ignores `.env` and `.env.*` except `.env.example`.
 
-## 🏗️ Project Structure
+## Commands
+
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Vite dev server |
+| `npm run build` | Typecheck + production build |
+| `npm run typecheck` | TypeScript only |
+| `npm run lint` | ESLint (zero warnings) |
+| `npm test` | Unit tests |
+| `npm run test:watch` | Unit tests in watch mode |
+| `npm run test:rules` | Firestore rules tests (emulator) |
+| `npm run security` | Lint + production audit (high) |
+| `npm run security:all` | Lint + full audit including dev tooling |
+| `npm run security:report` | Write a local security report |
+| `npm run preview` | Preview the build |
+| `npm run deploy` | Build + deploy hosting |
+
+## Architecture
 
 ```text
-umnotho/
-├── 📁 src/                  # Source code
-│   ├── 📁 components/       # UI Components (Atomic Design)
-│   ├── 📁 hooks/            # Custom React hooks
-│   ├── 📁 utils/            # Pure utility functions
-│   ├── 📁 services/         # API & External services
-│   ├── 📁 types/            # TypeScript interfaces/types
-│   ├── 📁 store/            # State management (Context/Zustand)
-│   └── 📁 assets/           # Images, fonts, global CSS
-├── 📁 public/               # Static public assets
-├── 📁 docs/                 # Detailed documentation
-├── 📁 scripts/              # Build and CI/CD scripts
-├── 📄 vite.config.ts        # Vite configuration
-└── 📄 tsconfig.json         # TS configuration
+src/
+├── App.tsx                 # Routes + route guards
+├── main.tsx                # AuthProvider + React root
+├── contexts/AuthContext.tsx
+├── components/
+│   ├── AppNav.tsx          # Shared signed-in navigation
+│   ├── Auth.tsx            # Email/password + Google
+│   ├── Barter.tsx          # Listings, questions, votes, offer modal
+│   ├── MyBids.tsx          # Received/placed offers + messaging + ratings
+│   ├── Profile.tsx         # Public profile and received-rating average
+│   ├── Pricing.tsx         # Display-only pricing (demo)
+│   └── RouteGuards.tsx     # ProtectedRoute / PublicOnlyRoute
+├── lib/
+│   ├── firebase.ts         # Single initializeApp, auth, db, emulators
+│   ├── types.ts            # Domain types
+│   ├── validation.ts       # Pure listing/offer/message validation
+│   ├── votes.ts            # Vote summaries and one-vote rule
+│   ├── bids.ts             # Roles and status transitions
+│   └── user.ts             # Rule-safe display names
+└── index.css               # Tailwind theme tokens
 ```
 
----
+### Rules of thumb
 
-## 🧪 Development Workflow
+- Keep business logic in `src/lib/` pure so it is easy to unit test.
+- Keep Firestore reads/writes in components or small helpers; always handle
+  `permission-denied` and `failed-precondition` with a readable message.
+- Never write a field the security rules do not allow. If you add a field, update
+  the rules and the rules tests in the same change.
+- Use `serverTimestamp()` for top-level metadata; **do not** use it inside
+  `arrayUnion` (Firestore rejects sentinels inside array elements). Use
+  `Timestamp.now()` for array entries.
+- Route every page that needs a user through `ProtectedRoute`; keep the auth state
+  in `AuthContext`, not in per-page listeners.
 
-### Branch Strategy
-- `main`: Production-ready code only.
-- `develop`: Main integration branch.
-- `feature/*`: New features or improvements.
-- `hotfix/*`: Urgent production fixes.
+## Data writes that matter
 
-### Commit Message Convention
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` A new feature.
-- `fix:` A bug fix.
-- `docs:` Documentation only changes.
-- `style:` Formatting, missing semi colons, etc.
-- `refactor:` Code change that neither fixes a bug nor adds a feature.
+### Listing
 
----
+```ts
+addDoc(collection(db, 'barterItems'), {
+  ownerId: user.uid,
+  ownerName: displayNameFor(user),
+  name, description,
+  estimatedValue: parseRandValue(draft.estimatedValue),
+  city, type, isBusinessBid,
+  inquiries: [],
+  votes: {},
+  createdAt: serverTimestamp(),
+});
+```
 
-## 🔧 Tooling Setup
+### Question (append-only)
 
-### Recommended VS Code Extensions
-- ESLint (`dbaeumer.vscode-eslint`)
-- Prettier (`esbenp.prettier-vscode`)
-- Tailwind CSS IntelliSense (`bradlc.vscode-tailwindcss`)
-- Vitest (`vitest.explorer`)
+```ts
+updateDoc(itemRef, {
+  inquiries: arrayUnion({
+    senderId: user.uid,
+    senderName: displayNameFor(user),
+    message,
+    createdAt: Timestamp.now(),
+  }),
+});
+```
 
-### Development Scripts
+### Vote (one per account)
 
-| Script | Purpose |
+```ts
+updateDoc(itemRef, { [`votes.${user.uid}`]: 'up' });
+```
+
+### Offer
+
+Create `activeBids/{id}` with a snapshot of the listing and `status: 'Pending'`.
+The rules verify that `itemId` exists and that its owner matches `ownerId`. Both
+participants can append messages; only the owner changes status.
+
+## Firestore rules and indexes
+
+- Rules live in `firestore.rules`; they are the authorization boundary.
+- The only composite index currently needed is `activeBids(itemId, bidderId)`
+  for the duplicate-offer check in `Barter.tsx`. It is declared in
+  `firestore.indexes.json`.
+- Deploy rules and indexes:
+
+  ```bash
+  firebase deploy --only firestore:rules,firestore:indexes
+  ```
+
+- Test rules locally:
+
+  ```bash
+  npm run test:rules
+  ```
+
+  This starts the Firestore emulator via `firebase emulators:exec` (fetched with
+  `npx`), runs the Vitest suite in `tests/rules/`, and shuts the emulator down.
+  Java 11+ must be installed.
+
+## Testing
+
+- Unit tests live next to the code as `*.test.ts` in `src/lib/`.
+- Rules tests live in `tests/rules/`.
+- `npm test` does **not** start an emulator, so it is fast and works offline.
+- Add a unit test for pure logic and a rules test for any new authorization path.
+
+## CI and deployment
+
+`.github/workflows/ci.yml` runs lint, typecheck, unit tests, build and rules
+tests. `.github/workflows/deploy.yml` deploys hosting on `main` when
+`FIREBASE_SERVICE_ACCOUNT` is set.
+
+Deployment secrets:
+
+| Secret | Used for |
 | :--- | :--- |
-| `npm run dev` | Starts Vite dev server with HMR |
-| `npm run build` | Compiles code for production |
-| `npm run lint` | Runs ESLint and Prettier checks |
-| `npm run test` | Runs the Vitest test suite |
-| `npm run type-check` | Runs TypeScript compiler check |
+| `FIREBASE_SERVICE_ACCOUNT` | Hosting deploy authentication |
+| `VITE_FIREBASE_API_KEY` | Build-time Firebase config |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Build-time Firebase config |
+| `VITE_FIREBASE_PROJECT_ID` | Build-time config + hosting project |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Build-time config |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build-time config |
+| `VITE_FIREBASE_APP_ID` | Build-time config |
 
----
+## Troubleshooting
 
-## 📝 Code Standards
+| Symptom | Likely cause |
+| :--- | :--- |
+| “Firebase is not configured” on load | `.env.local` missing or variable names typo’d |
+| `permission-denied` when creating a listing | Not signed in, wrong `ownerId`, or a field not allowed by the rules |
+| `failed-precondition` on placing an offer | Index not deployed; run `firebase deploy --only firestore:indexes` |
+| Google sign-in popup closes | Domain not in Firebase Auth authorized domains, or popup blocked (the app falls back to redirect) |
+| Rules tests cannot connect | Emulator not running or port 8080 is in use; `npm run test:rules` starts it for you |
+| Rules tests fail to start | Java is not installed or not on `PATH` |
 
-### TypeScript Guidelines
-- Always use interfaces for objects; use types for unions/aliases.
-- Avoid `any` at all costs. Use `unknown` if the type is truly dynamic.
-- Export types from a central `types/` directory when shared.
+## Commit style
 
-### React Component Patterns
-```typescript
-// ✅ Functional Components with Props interfaces
-interface UserCardProps {
-  name: string;
-  role: 'admin' | 'user';
-}
+Use short, imperative commits, for example:
 
-export const UserCard = ({ name, role }: UserCardProps) => {
-  return <div className="p-4 border">{name} ({role})</div>;
-};
-```
-
----
-
-## 🧪 Testing Guide
-
-We use **Vitest** and **React Testing Library**.
-
-```bash
-# Run tests in watch mode
-npm run test
-
-# Check coverage
-npm run test:coverage
-```
-
-**Requirements:**
-1. All new components must have a `.test.tsx` file.
-2. Logic in `utils/` must have 100% unit test coverage.
-3. Complex user flows must have an integration test.
-
----
-
-## 🚢 Deployment
-
-1. Ensure `npm run build` passes locally.
-2. Merges to `main` trigger the GitHub Action for production deployment.
-3. Verify the **Security Audit** (`npm run security:report`) passes before any production release.
-
----
-
-## 🤝 Team Practices
-
-- **Code Reviews**: Every PR requires at least 2 approvals.
-- **Standups**: Daily at 09:30 AM via Slack/Teams.
-- **Blockers**: Post in `#dev-help` if you are stuck for more than 1 hour.
-
-<div align="center">
-
-Happy Coding! 🚀
-
-[🔙 Back to Main README](./README.md) • [🔒 Security Guide](./SECURITY.md)
-
-</div>
-```
-
----
-
-### 4. Supporting Files
-
-#### CHANGELOG.md
-```markdown
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-## [1.0.0] - 2023-10-27
-### Added
-- Initial project structure with Vite + React + TypeScript.
-- Integrated Tailwind CSS for styling.
-- Core Documentation suite (README, SECURITY, DEVELOPER).
-- Initial CI/CD pipeline configuration.
-
-### Security
-- Implemented ESLint security plugins.
-- Added automated dependency vulnerability scanning.
-```
-
-#### CONTRIBUTING.md
-```markdown
-# Contributing to UMNOTHO
-
-We love your input! We want to make contributing to UMNOTHO as easy and transparent as possible.
-
-## Pull Request Process
-
-1. **Fork** the repository and create your branch from `develop`.
-2. **Install** dependencies with `npm install`.
-3. **Draft PR**: If your work is in progress, open a Draft PR.
-4. **Testing**: Ensure all tests pass (`npm run test`) and no linting errors exist.
-5. **Review**: Once submitted, tag the relevant leads for review.
-
-## Code of Conduct
-By participating, you are expected to uphold our Code of Conduct.
-```
-
-#### CODE_OF_CONDUCT.md
-```markdown
-# Code of Conduct
-
-## Our Pledge
-We pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
-
-## Standards
-- Use welcoming and inclusive language.
-- Be respectful of differing viewpoints and experiences.
-- Gracefully accept constructive criticism.
-- Focus on what is best for the community.
-
-## Enforcement
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project team at `bongy.tech@gmail.com`.
+```text
+fix(barter): send offers to activeBids and snapshot the listing
+feat(auth): add protected routes and shared auth context
+docs: document the rules and demo limitations
 ```

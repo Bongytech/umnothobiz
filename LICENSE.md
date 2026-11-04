@@ -1,4 +1,3 @@
-```markdown
 # UMNOTHO NON-COMMERCIAL LICENSE
 
 Copyright (c) 2024 Bongytech

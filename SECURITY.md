@@ -77,7 +77,9 @@ are in [docs/crypto-payments.md](./docs/crypto-payments.md).
 - There are no private keys, seed phrases, provider API keys, or service-account
   credentials in the app, the functions source, or this repository.
 - `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` are Firebase Functions
-  secrets, bound to the checkout/webhook functions. They are never `VITE_*`.
+  secrets (when `USE_SECRET_MANAGER=true`) or Functions environment variables.
+  Both live server-side; never `VITE_*` and never committed. The environment
+  fallback is less isolated; prefer Secret Manager once the API is enabled.
 - A deployed function with no `CRYPTO_PROVIDER` refuses to create a checkout.
   The sandbox adapter only works when the Functions emulator is running.
 - `confirmSandboxPayment` is disabled unless `FUNCTIONS_EMULATOR=true` or

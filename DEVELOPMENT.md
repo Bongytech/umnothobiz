@@ -67,14 +67,22 @@ config/secrets in production. They are **never** committed.
 | `APP_URL` | Public app URL for success/cancel redirects |
 | `REQUIRE_VERIFIED_EMAIL` | Set `true` to block checkout until the email is verified |
 | `ENFORCE_APP_CHECK` | Set `true` to require App Check tokens on callables |
+| `USE_SECRET_MANAGER` | Set `true` to bind credentials from Secret Manager; leave false to use Functions env vars |
+| `NOWPAYMENTS_API_KEY` | API key (Secret Manager or Functions env; never commit) |
+| `NOWPAYMENTS_IPN_SECRET` | IPN signing secret (Secret Manager or Functions env; never commit) |
 | `SANDBOX_ZAR_PER_USDT` | Sandbox quote rate, e.g. `18.50` |
 | `SANDBOX_USDT_ADDRESS` | Sandbox display address |
 | `SANDBOX_NETWORK` | Sandbox network label |
 | `SANDBOX_WEBHOOK_SECRET` | HMAC secret for the sandbox webhook |
 
 `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` must be Firebase Functions
-secrets (`firebase functions:secrets:set …`), never `.env` files or git. For
+secrets or Functions environment variables, never `.env` files or git. For
 emulator-only placeholder secrets, use `functions/.secret.local` (ignored).
+
+If `firebase deploy` reports that the Secret Manager API is disabled, either
+enable it (`gcloud services enable secretmanager.googleapis.com`) or leave
+`USE_SECRET_MANAGER` false and use the environment-variable fallback. The adapter
+reads both paths from `process.env`.
 
 `FUNCTIONS_EMULATOR=true` is set automatically by the emulator and enables the
 sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout.
@@ -101,7 +109,9 @@ sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout
 | `npm run security:report` | Write a local security report |
 | `npm run preview` | Preview the build |
 | `npm run deploy:hosting` | Build + deploy Hosting only |
-| `npm run deploy` | Build + deploy Hosting + Cloud Functions |
+| `npm run deploy` | Build + deploy Hosting + Firestore (free/Spark compatible) |
+| `npm run deploy:functions` | Deploy Functions only (requires Blaze) |
+| `npm run deploy:all` | Deploy Hosting + Firestore + Functions |
 
 ## Architecture
 
@@ -257,8 +267,23 @@ Key invariants:
 ## CI and deployment
 
 `.github/workflows/ci.yml` runs lint, typecheck, unit tests, build, Functions
-tests/build and rules tests. `.github/workflows/deploy.yml` deploys hosting and
-Cloud Functions on `main` when `FIREBASE_SERVICE_ACCOUNT` is set.
+tests/build and rules tests. `.github/workflows/deploy.yml` deploys Hosting +
+Firestore on `main` when `FIREBASE_SERVICE_ACCOUNT` is set. Cloud Functions are
+deployed only when the repository variable `CRYPTO_PROVIDER=nowpayments` is set.
+
+**Free/Spark deployment:** `firebase deploy` uses `firebase.json`, which contains
+only Hosting + Firestore, so it works without a billing account. Crypto checkout
+is unavailable in that mode.
+
+**Blaze deployment:** Cloud Functions v2 need Cloud Run, Cloud Build and Artifact
+Registry, which require an open billing account. Use:
+
+```bash
+npm run deploy:functions
+```
+
+This uses `firebase.functions.json`, so it does not re-deploy Hosting/Firestore.
+The local full emulator stack uses `firebase.emulators.json`.
 
 Deployment secrets:
 
@@ -283,9 +308,9 @@ firebase functions:secrets:set NOWPAYMENTS_API_KEY
 firebase functions:secrets:set NOWPAYMENTS_IPN_SECRET
 ```
 
-Without the repository variable, the workflow deploys Hosting only and skips the
-Functions step. Set `APP_URL` and `CRYPTO_WEBHOOK_URL` in the Functions environment
-to the real domain and deployed webhook URL.
+Without the repository variable, the workflow deploys Hosting + Firestore and
+skips the Functions step. Set `APP_URL` and `CRYPTO_WEBHOOK_URL` in the Functions
+environment to the real domain and deployed webhook URL.
 
 ## Troubleshooting
 
@@ -303,6 +328,22 @@ to the real domain and deployed webhook URL.
 | `permission-denied` confirming sandbox payment | `ALLOW_SANDBOX_PAYMENTS`/emulator guard is off, or the payment is expired |
 | `failed-precondition` starting checkout | Email verification is required (`REQUIRE_VERIFIED_EMAIL=true`), or NOWPayments is not configured |
 | NOWPayments webhook 400 | Wrong `x-nowpayments-sig`, missing `order_id`, or `CRYPTO_WEBHOOK_URL` mismatch |
+
+### Windows: esbuild “Access is denied” during build
+
+If `npm run build` fails with `[vite:esbuild-transpile] remove ...esbuild-...: Access is denied`, the
+workspace was marked with the Windows **Low** integrity label (often after a sandboxed run).
+The esbuild executable cannot then delete its temp files. Raise the executable and its parent
+directories to Medium, then rebuild:
+
+```powershell
+icacls "node_modules\@esbuild" /setintegritylevel "(OI)(CI)Medium"
+icacls "node_modules\@esbuild\win32-x64" /setintegritylevel "(OI)(CI)Medium"
+icacls "node_modules\@esbuild\win32-x64\esbuild.exe" /setintegritylevel Medium
+npm run build
+```
+
+Run this again after a fresh `npm ci` if the workspace itself still has the Low label.
 
 ## Commit style
 

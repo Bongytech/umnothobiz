@@ -1,11 +1,4 @@
 {
-  "functions": {
-    "source": "functions",
-    "codebase": "default",
-    "predeploy": [
-      "npm --prefix \"$RESOURCE_DIR\" run build"
-    ]
-  },
   "hosting": {
     "site": "umnothobiz",
     "public": "dist",
@@ -57,9 +50,6 @@
     },
     "firestore": {
       "port": 8080
-    },
-    "functions": {
-      "port": 5001
     },
     "hosting": {
       "port": 5000

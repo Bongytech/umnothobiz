@@ -15,7 +15,9 @@ import {
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
 
-const withSecrets = { secrets: cryptoSecrets };
+const withSecrets = {
+  ...(cryptoSecrets.length > 0 ? { secrets: cryptoSecrets } : {}),
+};
 const callableOptions = {
   ...withSecrets,
   enforceAppCheck: process.env.ENFORCE_APP_CHECK === 'true',

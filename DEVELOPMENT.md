@@ -67,14 +67,22 @@ config/secrets in production. They are **never** committed.
 | `APP_URL` | Public app URL for success/cancel redirects |
 | `REQUIRE_VERIFIED_EMAIL` | Set `true` to block checkout until the email is verified |
 | `ENFORCE_APP_CHECK` | Set `true` to require App Check tokens on callables |
+| `USE_SECRET_MANAGER` | Set `true` to bind credentials from Secret Manager; leave false to use Functions env vars |
+| `NOWPAYMENTS_API_KEY` | API key (Secret Manager or Functions env; never commit) |
+| `NOWPAYMENTS_IPN_SECRET` | IPN signing secret (Secret Manager or Functions env; never commit) |
 | `SANDBOX_ZAR_PER_USDT` | Sandbox quote rate, e.g. `18.50` |
 | `SANDBOX_USDT_ADDRESS` | Sandbox display address |
 | `SANDBOX_NETWORK` | Sandbox network label |
 | `SANDBOX_WEBHOOK_SECRET` | HMAC secret for the sandbox webhook |
 
 `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` must be Firebase Functions
-secrets (`firebase functions:secrets:set …`), never `.env` files or git. For
+secrets or Functions environment variables, never `.env` files or git. For
 emulator-only placeholder secrets, use `functions/.secret.local` (ignored).
+
+If `firebase deploy` reports that the Secret Manager API is disabled, either
+enable it (`gcloud services enable secretmanager.googleapis.com`) or leave
+`USE_SECRET_MANAGER` false and use the environment-variable fallback. The adapter
+reads both paths from `process.env`.
 
 `FUNCTIONS_EMULATOR=true` is set automatically by the emulator and enables the
 sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout.

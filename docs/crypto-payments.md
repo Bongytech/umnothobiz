@@ -123,12 +123,24 @@ dummy values (ignored by git).
 ## Live NOWPayments setup
 
 1. Create a NOWPayments account, wallet, API key, and IPN secret.
-2. Set the secrets (never commit them):
+2. Provide the two credentials using **one** of these options:
+
+   **A. Secret Manager (recommended, free tier available).** Enable the API
+   first if Firebase reports it is disabled, then set the secrets:
 
    ```bash
+   gcloud services enable secretmanager.googleapis.com
    firebase functions:secrets:set NOWPAYMENTS_API_KEY
    firebase functions:secrets:set NOWPAYMENTS_IPN_SECRET
    ```
+
+   Set `USE_SECRET_MANAGER=true` in the Functions environment.
+
+   **B. Free environment-variable fallback.** Leave `USE_SECRET_MANAGER` unset or
+   `false`, and put `NOWPAYMENTS_API_KEY` / `NOWPAYMENTS_IPN_SECRET` in
+   `functions/.env.<project-id>` (or the Firebase console). The file is ignored
+   by git. This avoids the Secret Manager API entirely, but the values are less
+   isolated than Secret Manager; move to option A before a public launch.
 
 3. Set non-secret Functions environment values in `functions/.env.<project-id>`
    (or the Firebase console):

@@ -188,7 +188,9 @@ Run these from the `umnotho/` directory.
 | `npm run security` | Lint plus a production-dependency audit (`npm audit --omit=dev`) |
 | `npm run security:all` | Same, including dev-tool advisories |
 | `npm run deploy:hosting` | Build and deploy Firebase Hosting only |
-| `npm run deploy` | Build and deploy Hosting + Cloud Functions |
+| `npm run deploy` | Build and deploy Hosting + Firestore rules/indexes (free/Spark compatible) |
+| `npm run deploy:functions` | Deploy Cloud Functions only (requires Blaze billing) |
+| `npm run deploy:all` | Deploy Hosting + Firestore + Cloud Functions |
 
 `test:rules` needs a Java runtime for the Firestore emulator (the Firebase CLI is
 fetched through `npx`):
@@ -274,9 +276,12 @@ See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
 - **CI** runs lint, typecheck, unit tests, the production build, Cloud Functions
   tests/build, and rules tests on every push and pull request.
 - **Deployment** runs on `main` when `FIREBASE_SERVICE_ACCOUNT` is configured;
-  otherwise the deploy step is skipped instead of failing the build. Cloud
-  Functions deploy only when the repository variable `CRYPTO_PROVIDER=nowpayments`
-  is set and the NOWPayments Firebase secrets exist.
+  otherwise the deploy step is skipped instead of failing the build. The default
+  `npm run deploy` / `firebase deploy` path deploys Hosting + Firestore and works
+  on the free Spark plan. Cloud Functions require Blaze billing and deploy
+  separately with `npm run deploy:functions`; the workflow does this only when
+  the repository variable `CRYPTO_PROVIDER=nowpayments` is set and the
+  NOWPayments credentials exist.
 
 ---
 

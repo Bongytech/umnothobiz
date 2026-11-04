@@ -69,7 +69,7 @@ jobs:
         run: |
           printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
-          npx --yes firebase-tools@15 deploy --only functions --project "$PROJECT_ID" --non-interactive
+          npx --yes firebase-tools@15 -c firebase.functions.json deploy --only functions --project "$PROJECT_ID" --non-interactive
 
       - name: Deploy to Firebase Hosting
         if: steps.credentials.outputs.ready == 'true'

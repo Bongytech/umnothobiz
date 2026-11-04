@@ -80,7 +80,6 @@ These fields are written only by the Admin SDK inside `settlePayment()`.
 | `getCryptoCheckout` | Callable | Required | Owner-only status polling |
 | `confirmSandboxPayment` | Callable | Required | Local-only simulation through the same settlement path |
 | `cryptoWebhook` | HTTPS | Provider signature | Verify and settle a real payment |
-| `expireStalePayments` | Scheduled | — | Marks forgotten checkouts as expired every hour |
 
 Rate limiting: five checkout creations per UID per 15 minutes (`rateLimits`
 collection, Admin SDK only).

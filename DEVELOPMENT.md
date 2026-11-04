@@ -109,7 +109,9 @@ sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout
 | `npm run security:report` | Write a local security report |
 | `npm run preview` | Preview the build |
 | `npm run deploy:hosting` | Build + deploy Hosting only |
-| `npm run deploy` | Build + deploy Hosting + Cloud Functions |
+| `npm run deploy` | Build + deploy Hosting + Firestore (free/Spark compatible) |
+| `npm run deploy:functions` | Deploy Functions only (requires Blaze) |
+| `npm run deploy:all` | Deploy Hosting + Firestore + Functions |
 
 ## Architecture
 
@@ -265,8 +267,23 @@ Key invariants:
 ## CI and deployment
 
 `.github/workflows/ci.yml` runs lint, typecheck, unit tests, build, Functions
-tests/build and rules tests. `.github/workflows/deploy.yml` deploys hosting and
-Cloud Functions on `main` when `FIREBASE_SERVICE_ACCOUNT` is set.
+tests/build and rules tests. `.github/workflows/deploy.yml` deploys Hosting +
+Firestore on `main` when `FIREBASE_SERVICE_ACCOUNT` is set. Cloud Functions are
+deployed only when the repository variable `CRYPTO_PROVIDER=nowpayments` is set.
+
+**Free/Spark deployment:** `firebase deploy` uses `firebase.json`, which contains
+only Hosting + Firestore, so it works without a billing account. Crypto checkout
+is unavailable in that mode.
+
+**Blaze deployment:** Cloud Functions v2 need Cloud Run, Cloud Build and Artifact
+Registry, which require an open billing account. Use:
+
+```bash
+npm run deploy:functions
+```
+
+This uses `firebase.functions.json`, so it does not re-deploy Hosting/Firestore.
+The local full emulator stack uses `firebase.emulators.json`.
 
 Deployment secrets:
 
@@ -291,9 +308,9 @@ firebase functions:secrets:set NOWPAYMENTS_API_KEY
 firebase functions:secrets:set NOWPAYMENTS_IPN_SECRET
 ```
 
-Without the repository variable, the workflow deploys Hosting only and skips the
-Functions step. Set `APP_URL` and `CRYPTO_WEBHOOK_URL` in the Functions environment
-to the real domain and deployed webhook URL.
+Without the repository variable, the workflow deploys Hosting + Firestore and
+skips the Functions step. Set `APP_URL` and `CRYPTO_WEBHOOK_URL` in the Functions
+environment to the real domain and deployed webhook URL.
 
 ## Troubleshooting
 

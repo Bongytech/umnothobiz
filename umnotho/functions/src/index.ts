@@ -1,8 +1,5 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
-import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { Timestamp } from 'firebase-admin/firestore';
-import { db } from './admin';
 import { getProvider } from './provider';
 import { cryptoSecrets } from './secrets';
 import {
@@ -117,30 +114,5 @@ export const cryptoWebhook = onRequest(withSecrets, async (request, response) =>
   } catch (error) {
     console.error('Crypto webhook rejected:', error);
     response.status(400).json({ ok: false, error: 'Invalid webhook' });
-  }
-});
-
-/**
- * Safety net for forgotten checkouts. A payment stops being payable at its
- * expiry, but marking it explicitly keeps the UI and reconciliation clear.
- */
-export const expireStalePayments = onSchedule('every 60 minutes', async () => {
-  const snapshot = await db.collection('payments').where('status', '==', 'pending').limit(500).get();
-  const now = Date.now();
-  const batch = db.batch();
-  let count = 0;
-
-  for (const payment of snapshot.docs) {
-    const expiresAt = payment.data().expiresAt;
-    if (expiresAt instanceof Timestamp && expiresAt.toMillis() <= now) {
-      batch.update(payment.ref, { status: 'expired', updatedAt: Timestamp.now() });
-      count += 1;
-      if (count >= 450) break;
-    }
-  }
-
-  if (count > 0) {
-    await batch.commit();
-    console.log(`Expired ${count} stale crypto checkout(s).`);
   }
 });

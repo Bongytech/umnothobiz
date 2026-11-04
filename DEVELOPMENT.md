@@ -47,6 +47,7 @@ On PowerShell, use `Copy-Item .env.example .env.local`.
 | `VITE_FIREBASE_APP_ID` | yes | Web app ID |
 | `VITE_FIREBASE_MEASUREMENT_ID` | no | Analytics measurement ID |
 | `VITE_USE_FIREBASE_EMULATORS` | no | Set to `true` to connect to local emulators |
+| `VITE_RECAPTCHA_SITE_KEY` | production | App Check site key when Functions enforce App Check |
 
 These are identifiers, not server secrets, but keep per-environment files out of
 git. `.gitignore` ignores `.env` and `.env.*` except `.env.example`.
@@ -58,12 +59,22 @@ config/secrets in production. They are **never** committed.
 
 | Variable | Purpose |
 | :--- | :--- |
-| `CRYPTO_PROVIDER` | Provider id (`sandbox` only in emulator; real adapter id in production) |
+| `CRYPTO_PROVIDER` | Provider id (`sandbox` in emulator, `nowpayments` in production) |
 | `ALLOW_SANDBOX_PAYMENTS` | Must be `true` only for local sandbox; never in production |
+| `NOWPAYMENTS_API_URL` | NOWPayments API base, e.g. `https://api.nowpayments.io/v1` |
+| `NOWPAYMENTS_PAY_CURRENCY` | Pay currency, default `usdttrc20` |
+| `CRYPTO_WEBHOOK_URL` | Public `cryptoWebhook` URL used in the NOWPayments invoice |
+| `APP_URL` | Public app URL for success/cancel redirects |
+| `REQUIRE_VERIFIED_EMAIL` | Set `true` to block checkout until the email is verified |
+| `ENFORCE_APP_CHECK` | Set `true` to require App Check tokens on callables |
 | `SANDBOX_ZAR_PER_USDT` | Sandbox quote rate, e.g. `18.50` |
 | `SANDBOX_USDT_ADDRESS` | Sandbox display address |
 | `SANDBOX_NETWORK` | Sandbox network label |
 | `SANDBOX_WEBHOOK_SECRET` | HMAC secret for the sandbox webhook |
+
+`NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` must be Firebase Functions
+secrets (`firebase functions:secrets:set …`), never `.env` files or git. For
+emulator-only placeholder secrets, use `functions/.secret.local` (ignored).
 
 `FUNCTIONS_EMULATOR=true` is set automatically by the emulator and enables the
 sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout.
@@ -194,14 +205,22 @@ Key invariants:
 
 - Plan prices and durations live in `functions/src/plans.ts`; the browser sends
   only a plan id.
-- `createCryptoCheckout` locks the ZAR→USDT quote and creates `payments/{id}`.
-- Only the webhook or the local sandbox confirmation can call `settlePayment()`;
-  it is idempotent and activates the plan in the same transaction.
-- `payments` is read-own, write-never in `firestore.rules`.
+- `createCryptoCheckout` rate-limits per account, asks the provider for a
+  ZAR→USDT quote, and creates `payments/{id}`.
+- NOWPayments invoices use `price_currency=zar`, `pay_currency=usdttrc20`, a
+  fixed rate, and a public `CRYPTO_WEBHOOK_URL`.
+- Only the signed webhook or the local sandbox confirmation can call
+  `settlePayment()`; it is idempotent and activates the plan in the same
+  transaction. `finished` is the only NOWPayments status treated as paid;
+  `partially_paid` stays pending.
+- `payments` is read-own, write-never in `firestore.rules`. Checkout creation is
+  limited to five attempts per UID per 15 minutes.
 - `confirmSandboxPayment` is disabled unless the Functions emulator or
   `ALLOW_SANDBOX_PAYMENTS=true` is active. Never enable it in production.
-- There are no private keys in the frontend or repository. A real provider must
-  verify its own webhook signature and amount.
+- App Check and verified-email requirements are opt-in via
+  `ENFORCE_APP_CHECK=true` / `REQUIRE_VERIFIED_EMAIL=true`.
+- There are no private keys in the frontend or repository. NOWPayments secrets
+  live in Firebase Secret Manager and are bound to the functions.
 
 ## Firestore rules and indexes
 
@@ -256,6 +275,18 @@ Deployment secrets:
 Cloud Functions runtime is Node 22 (`functions/package.json`). Never commit the
 service-account JSON; keep it in the GitHub secret only.
 
+To deploy Functions automatically, set the GitHub Actions **repository variable**
+`CRYPTO_PROVIDER=nowpayments` and create the Firebase secrets first:
+
+```bash
+firebase functions:secrets:set NOWPAYMENTS_API_KEY
+firebase functions:secrets:set NOWPAYMENTS_IPN_SECRET
+```
+
+Without the repository variable, the workflow deploys Hosting only and skips the
+Functions step. Set `APP_URL` and `CRYPTO_WEBHOOK_URL` in the Functions environment
+to the real domain and deployed webhook URL.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -267,9 +298,11 @@ service-account JSON; keep it in the GitHub secret only.
 | Google sign-in popup closes | Domain not in Firebase Auth authorized domains, or popup blocked (the app falls back to redirect) |
 | Rules tests cannot connect | Emulator not running or port 8080 is in use; `npm run test:rules` starts it for you |
 | Rules tests fail to start | Java is not installed or not on `PATH` |
-| Pricing says crypto checkout is unavailable | Cloud Functions are not deployed or emulated; run `npm run emulators` or deploy Functions |
+| Pricing says crypto checkout is unavailable | Cloud Functions are not deployed or emulated, or `CRYPTO_PROVIDER` is unset; run `npm run emulators` or configure NOWPayments |
 | Functions emulator fails to load | Run `npm run functions:build`; check `firebase-debug.log` and that `functions/package.json` main points at `lib/index.js` |
 | `permission-denied` confirming sandbox payment | `ALLOW_SANDBOX_PAYMENTS`/emulator guard is off, or the payment is expired |
+| `failed-precondition` starting checkout | Email verification is required (`REQUIRE_VERIFIED_EMAIL=true`), or NOWPayments is not configured |
+| NOWPayments webhook 400 | Wrong `x-nowpayments-sig`, missing `order_id`, or `CRYPTO_WEBHOOK_URL` mismatch |
 
 ## Commit style
 

@@ -71,29 +71,35 @@ The full source is [umnotho/firestore.rules](./umnotho/firestore.rules).
 
 ## Crypto payments
 
-Phase 1 is a **sandbox** integration. Full details are in
-[docs/crypto-payments.md](./docs/crypto-payments.md).
+Phase 1 includes a **NOWPayments** live adapter and a local sandbox. Full details
+are in [docs/crypto-payments.md](./docs/crypto-payments.md).
 
-- There are no private keys, seed phrases, or service-account credentials in the
-  app, the functions source, or this repository.
-- The checkout uses a provider adapter. The sandbox adapter only works when the
-  Functions emulator is running; a deployed function with no `CRYPTO_PROVIDER`
-  refuses to create a checkout.
+- There are no private keys, seed phrases, provider API keys, or service-account
+  credentials in the app, the functions source, or this repository.
+- `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` are Firebase Functions
+  secrets, bound to the checkout/webhook functions. They are never `VITE_*`.
+- A deployed function with no `CRYPTO_PROVIDER` refuses to create a checkout.
+  The sandbox adapter only works when the Functions emulator is running.
 - `confirmSandboxPayment` is disabled unless `FUNCTIONS_EMULATOR=true` or
   `ALLOW_SANDBOX_PAYMENTS=true`. The latter must never be set in production.
-- Real providers must verify their webhook signature over the raw body. The
-  settlement transaction is idempotent and rejects an amount mismatch when the
-  provider supplies `amountUsdt`.
-- Adding a real provider requires a business account, webhook secret, and
-  compliance review. Do not put provider API secrets in Vite variables — anything
-  prefixed `VITE_` ships to the browser.
+- NOWPayments webhooks are verified with HMAC-SHA512 over the sorted raw JSON
+  body (`x-nowpayments-sig`). The settlement transaction is idempotent, rejects
+  an amount more than 2% below the quote, and only `finished` counts as paid.
+- Checkout creation is rate-limited to five attempts per UID per 15 minutes.
+- App Check enforcement and verified-email requirements are opt-in
+  (`ENFORCE_APP_CHECK=true`, `REQUIRE_VERIFIED_EMAIL=true`) and should be enabled
+  for production.
+- A real launch still requires a provider business account, compliance review,
+  refunds/reconciliation, and monitoring. Do not put provider API secrets in Vite
+  variables — anything prefixed `VITE_` ships to the browser.
 
 ## Public repository rules
 
 This repository is public. Therefore:
 
-- Never commit `.env`, `.env.local`, `functions/.env*`, service-account JSON,
-  provider API keys, wallet private keys, seed phrases, or webhook secrets.
+- Never commit `.env`, `.env.local`, `functions/.env*`, `functions/.secret.local`,
+  service-account JSON, provider API keys, wallet private keys, seed phrases, or
+  webhook secrets.
 - Firebase **web** config values (`VITE_FIREBASE_*`) are public identifiers that
   ship in the browser bundle; they are not authorization. Do not treat them as
   secrets, but still keep per-environment files out of git.
@@ -108,19 +114,17 @@ This repository is public. Therefore:
 
 These are deliberate gaps in a demo, not unnoticed bugs:
 
-- **No rate limiting or spam controls.** A signed-in user can create many
-  listings, questions, bids or messages within the schema limits.
+- **No rate limiting for listings, questions, bids, or messages.** Checkout
+  creation is limited, but social/content endpoints still rely on the schema.
 - **Ratings are not tied to a verified completed transaction** in rules. The UI
   only offers rating after a completed bid, but a determined client could write a
   rating for any other user once. A production system needs a trusted backend or
   Cloud Function to validate the trade.
-- **No email-verification gate.** Accounts are usable immediately after signup.
-- **Crypto checkout is sandbox-only.** No real provider is configured, no real
-  funds are collected, and the sandbox confirmation path must remain disabled in
-  production. A real launch needs a provider, webhook secret, KYC/AML review,
-  refunds, and accounting.
-- **No payment rate limiting.** A signed-in user can create multiple pending
-  sandbox checkouts; add per-UID rate limiting before launch.
+- **Email verification is opt-in.** It is sent at signup and enforced for
+  checkout only when `REQUIRE_VERIFIED_EMAIL=true`.
+- **Live crypto is configured, not enabled by default.** The NOWPayments adapter
+  is present, but no provider keys are committed and the live path stays off until
+  Firebase secrets and the webhook URL are configured.
 - **No moderation or admin tooling.** Abusive content must be handled manually in
   the Firebase console.
 - **No image/file storage.** The Storage integration is not enabled.

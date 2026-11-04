@@ -1,9 +1,10 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from './admin';
-import { isExpired, paymentExpiry, quoteUsdt } from './core';
+import { isExpired, paymentExpiry } from './core';
 import { PLANS, isPlanId } from './plans';
 import type { PlanId } from './plans';
 import { getProvider, isSandbox, sandboxAllowed } from './provider';
+import { assertCheckoutRateLimit } from './rateLimit';
 import type { WebhookEvent } from './providers/types';
 
 export type PaymentErrorCode =
@@ -11,7 +12,8 @@ export type PaymentErrorCode =
   | 'not-found'
   | 'permission-denied'
   | 'expired'
-  | 'unavailable';
+  | 'unavailable'
+  | 'rate-limited';
 
 export class PaymentError extends Error {
   constructor(
@@ -33,6 +35,7 @@ export interface CheckoutResponse {
   provider: string;
   providerLabel: string;
   status: 'pending' | 'paid' | 'failed' | 'expired';
+  providerStatus: string | null;
   address: string | null;
   network: string;
   checkoutUrl: string | null;
@@ -44,13 +47,7 @@ export interface CheckoutResponse {
   sandbox: boolean;
 }
 
-const CHECKOUT_TTL_MINUTES = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function zarPerUsdt(): number {
-  const raw = Number(process.env.SANDBOX_ZAR_PER_USDT ?? '18.5');
-  return Number.isFinite(raw) && raw > 0 ? raw : 18.5;
-}
 
 function iso(value: unknown): string | null {
   return value instanceof Timestamp ? value.toDate().toISOString() : null;
@@ -67,6 +64,7 @@ function toResponse(paymentId: string, data: Record<string, unknown>): CheckoutR
     provider: String(data.provider ?? ''),
     providerLabel: String(data.providerLabel ?? ''),
     status: data.status as CheckoutResponse['status'],
+    providerStatus: typeof data.providerStatus === 'string' ? data.providerStatus : null,
     address: typeof data.address === 'string' ? data.address : null,
     network: String(data.network ?? ''),
     checkoutUrl: typeof data.checkoutUrl === 'string' ? data.checkoutUrl : null,
@@ -96,20 +94,31 @@ export async function createCheckout(ownerId: string, planId: unknown): Promise<
   }
 
   const plan = PLANS[planId];
+  try {
+    await assertCheckoutRateLimit(ownerId);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'rate-limited') {
+      throw new PaymentError(
+        'rate-limited',
+        'Too many checkout attempts. Please wait a few minutes and try again.',
+      );
+    }
+    throw error;
+  }
+
   const provider = resolveProvider();
-  const rateZarPerUsdt = zarPerUsdt();
-  const amountUsdt = quoteUsdt(plan.amountZar, rateZarPerUsdt);
+  const quote = await provider.quote(plan.amountZar);
   const paymentRef = db.collection('payments').doc();
   const paymentId = paymentRef.id;
   const now = Timestamp.now();
-  const expiresAt = Timestamp.fromDate(paymentExpiry(now.toMillis(), CHECKOUT_TTL_MINUTES));
+  const expiresAt = Timestamp.fromDate(paymentExpiry(now.toMillis(), provider.ttlMinutes));
 
   const session = await provider.createCheckout({
     paymentId,
     ownerId,
     plan,
-    amountUsdt,
-    rateZarPerUsdt,
+    amountUsdt: quote.amountUsdt,
+    rateZarPerUsdt: quote.rateZarPerUsdt,
   });
 
   const payment = {
@@ -117,11 +126,12 @@ export async function createCheckout(ownerId: string, planId: unknown): Promise<
     plan: plan.id,
     planName: plan.name,
     amountZar: plan.amountZar,
-    amountUsdt,
-    rateZarPerUsdt,
+    amountUsdt: quote.amountUsdt,
+    rateZarPerUsdt: quote.rateZarPerUsdt,
     provider: session.provider,
     providerLabel: session.providerLabel,
     providerPaymentId: session.providerPaymentId,
+    providerStatus: 'waiting',
     status: 'pending' as const,
     address: session.address ?? null,
     network: session.network,
@@ -221,21 +231,33 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
       return;
     }
 
+    if (event.status === 'pending') {
+      transaction.update(paymentRef, {
+        providerStatus: event.providerStatus ?? 'pending',
+        providerPaymentId: event.providerPaymentId ?? data.providerPaymentId ?? null,
+        updatedAt: now,
+      });
+      return;
+    }
+
     if (event.status !== 'paid') {
       transaction.update(paymentRef, {
         status: event.status,
+        providerStatus: event.providerStatus ?? event.status,
         updatedAt: now,
         txHash: event.txHash ?? null,
       });
       return;
     }
 
+    const expectedUsdt = Number(data.amountUsdt);
     if (
       typeof event.amountUsdt === 'number' &&
-      Math.abs(event.amountUsdt - Number(data.amountUsdt)) > 0.005
+      Math.abs(event.amountUsdt - expectedUsdt) > Math.max(0.01, expectedUsdt * 0.02)
     ) {
       transaction.update(paymentRef, {
         status: 'failed',
+        providerStatus: event.providerStatus ?? 'amount-mismatch',
         updatedAt: now,
         txHash: event.txHash ?? null,
       });
@@ -262,6 +284,8 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
 
     transaction.update(paymentRef, {
       status: 'paid',
+      providerStatus: event.providerStatus ?? 'finished',
+      providerPaymentId: event.providerPaymentId ?? data.providerPaymentId ?? null,
       paidAt: now,
       updatedAt: now,
       txHash: event.txHash ?? null,

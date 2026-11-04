@@ -4,6 +4,8 @@ import {
   createUserWithEmailAndPassword,
   getRedirectResult,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -22,6 +24,7 @@ export interface AuthContextValue {
   signUp: (email: string, password: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -106,6 +109,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // username. Both operations are allowed by the users rules.
     await ensureUserProfile(credential.user);
     await updateDoc(doc(db, 'users', credential.user.uid), { displayName });
+
+    try {
+      await sendEmailVerification(credential.user);
+    } catch (error) {
+      // Signup must still succeed if the verification email cannot be sent.
+      console.error('Could not send the verification email:', error);
+    }
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
@@ -124,9 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, signUp, signInWithGoogle, logout }),
-    [user, loading, login, signUp, signInWithGoogle, logout],
+    () => ({ user, loading, login, signUp, signInWithGoogle, logout, resetPassword }),
+    [user, loading, login, signUp, signInWithGoogle, logout, resetPassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

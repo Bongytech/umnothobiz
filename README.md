@@ -31,8 +31,9 @@ Firebase.
 - **Ratings** — one 1–5 star rating per trader per completed trade, shown as an
   average on the profile.
 - **Crypto subscription checkout** — ZAR-priced Basic/Biz plans paid in USDT via
-  a provider-agnostic hosted checkout. A Cloud Function verifies the payment and
-  activates the plan; the browser can never grant a plan.
+  a hosted checkout. NOWPayments is the first live adapter; a sandbox provider is
+  available for local work. A Cloud Function verifies the payment and activates
+  the plan; the browser can never grant a plan.
 - **Security rules** — Firestore rules enforce ownership, participation and
   append-only writes; see [firestore.rules](./umnotho/firestore.rules).
 
@@ -40,14 +41,14 @@ Firebase.
 
 This is not a production marketplace. In particular:
 
-- **Crypto checkout currently runs in sandbox mode.** It shows a test address and
-  can only be confirmed by the local Functions emulator. No real funds are
-  collected and no live provider is configured yet. See
-  [docs/crypto-payments.md](./docs/crypto-payments.md) for the provider
-  integration points.
+- **Crypto checkout is disabled until configured.** The NOWPayments adapter is
+  implemented, but live payments require provider secrets, a public webhook URL,
+  and Cloud Functions on Blaze. Without those, the UI reports crypto unavailable
+  or runs the local sandbox. No real funds are collected by default.
 - Barter top-ups and on-chain escrow are planned phases, not implemented.
-- There is no image upload, notification, search index, admin/moderation console,
-  or email-verification gate.
+- There is no image upload, notification, search index, or admin/moderation
+  console. Email verification is available but only enforced when
+  `REQUIRE_VERIFIED_EMAIL=true`.
 - Ratings are not tied to a verified completed transaction server-side; the UI
   only offers rating after a completed bid, but a custom client could still rate
   another user once.
@@ -63,7 +64,7 @@ This is not a production marketplace. In particular:
 | Build | Vite 6, TypeScript project references |
 | Routing | React Router 7 |
 | Backend | Firebase Authentication + Cloud Firestore + Cloud Functions |
-| Crypto | Provider-agnostic hosted checkout; USDT settlement; sandbox first |
+| Crypto | NOWPayments hosted checkout (USDT), local sandbox fallback |
 | Tests | Vitest, Firebase Rules Unit Testing |
 | CI | GitHub Actions (lint, typecheck, unit tests, build, rules tests) |
 
@@ -147,6 +148,10 @@ npm run dev
 
 Use any email/password on the Auth emulator screen, then open **Pricing** and pay
 with the sandbox button. No real funds move.
+
+For live NOWPayments configuration, see
+[docs/crypto-payments.md](./docs/crypto-payments.md). Never commit the provider
+keys or webhook secret.
 
 ### Optional: run against the emulators without crypto
 
@@ -247,9 +252,12 @@ so older documents continue to work.
   verified payment.
 - Payment documents are write-only through the Admin SDK; clients may read their
   own payment but cannot create one or mark it paid.
+- Checkout creation is rate-limited per account; App Check and email verification
+  can be enforced with `ENFORCE_APP_CHECK=true` and `REQUIRE_VERIFIED_EMAIL=true`.
 - No secrets are committed; `.env*` files are ignored except `.env.example`.
-  Service-account JSON and webhook secrets stay in GitHub/Firebase secrets. This
-  repository is public — see [SECURITY.md](./SECURITY.md) before adding config.
+  Service-account JSON, `functions/.secret.local`, and webhook secrets stay in
+  GitHub/Firebase secrets. This repository is public — see
+  [SECURITY.md](./SECURITY.md) before adding config.
 
 See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
 
@@ -260,13 +268,15 @@ See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
 - **Unit tests** cover validation, vote summaries, bid roles/transitions,
   display-name handling, and crypto formatting (`src/lib/*.test.ts`).
 - **Cloud Functions tests** cover plan maths, ZAR→USDT quoting, payment statuses,
-  and sandbox webhook signatures (`functions/src/*.test.ts`).
+  NOWPayments IPN signatures, and provider request shape (`functions/src/*.test.ts`).
 - **Rules tests** start the Firestore emulator and exercise owner, participant,
   outsider, and payment access (`tests/rules/`).
 - **CI** runs lint, typecheck, unit tests, the production build, Cloud Functions
   tests/build, and rules tests on every push and pull request.
 - **Deployment** runs on `main` when `FIREBASE_SERVICE_ACCOUNT` is configured;
-  otherwise the deploy step is skipped instead of failing the build.
+  otherwise the deploy step is skipped instead of failing the build. Cloud
+  Functions deploy only when the repository variable `CRYPTO_PROVIDER=nowpayments`
+  is set and the NOWPayments Firebase secrets exist.
 
 ---
 

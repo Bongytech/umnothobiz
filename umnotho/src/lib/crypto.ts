@@ -11,6 +11,7 @@ export interface CryptoCheckout {
   provider: string;
   providerLabel: string;
   status: CryptoPaymentStatus;
+  providerStatus: string | null;
   address: string | null;
   network: string;
   checkoutUrl: string | null;

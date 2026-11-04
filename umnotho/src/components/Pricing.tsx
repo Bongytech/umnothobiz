@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { sendEmailVerification } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -14,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import AppNav from './AppNav';
+import SiteFooter from './SiteFooter';
 import { useAuth } from '../contexts/AuthContext';
 import { functions } from '../lib/firebase';
 import type { CryptoCheckout } from '../lib/crypto';
@@ -95,6 +97,7 @@ export default function Pricing() {
   const [startingPlan, setStartingPlan] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [verificationNote, setVerificationNote] = useState('');
 
   const pendingPaymentId =
     checkout && checkout.status === 'pending' ? checkout.paymentId : null;
@@ -202,6 +205,20 @@ export default function Pricing() {
     }
   };
 
+  const resendVerification = async () => {
+    if (!user) return;
+    try {
+      await sendEmailVerification(user);
+      setVerificationNote('Verification email sent. Check your inbox, then refresh this page.');
+    } catch (error) {
+      console.error('Could not send verification email:', error);
+      setNotice({
+        tone: 'error',
+        text: 'Could not send the verification email. Try again in a few minutes.',
+      });
+    }
+  };
+
   const expired = checkout ? checkoutIsExpired(checkout.expiresAt) : false;
 
   return (
@@ -227,6 +244,30 @@ export default function Pricing() {
             keys or card details are handled by the browser.
           </p>
         </div>
+
+        {user && !user.emailVerified && (
+          <div className="max-w-6xl mx-auto mb-8 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200 flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="flex-1">
+              Verify your email before paying. A verification link was sent when you signed up.
+            </span>
+            <button
+              type="button"
+              onClick={() => void resendVerification()}
+              className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 font-medium text-amber-100 hover:bg-amber-400/20"
+            >
+              Resend verification email
+            </button>
+          </div>
+        )}
+
+        {verificationNote && (
+          <div
+            role="status"
+            className="max-w-6xl mx-auto mb-8 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-200"
+          >
+            {verificationNote}
+          </div>
+        )}
 
         {notice && (
           <div
@@ -313,6 +354,8 @@ export default function Pricing() {
         </div>
       </main>
 
+      <SiteFooter />
+
       <AnimatePresence>
         {checkout && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
@@ -342,6 +385,9 @@ export default function Pricing() {
               </h2>
               <p className="text-sm text-gray-400 mt-1 mb-6">
                 {checkout.providerLabel || checkout.provider}
+                {checkout.providerStatus
+                  ? ` · ${checkout.providerStatus.replace(/_/g, ' ')}`
+                  : ''}
               </p>
 
               {checkout.status === 'paid' ? (

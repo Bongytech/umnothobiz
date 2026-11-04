@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowRight, Lock, Mail, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,15 +31,17 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, signUp, signInWithGoogle } = useAuth();
+  const { login, signUp, signInWithGoogle, resetPassword } = useAuth();
   const from = (location.state as { from?: string } | null)?.from || '/barter';
 
   const handleAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    setNotice('');
 
     if (!isLogin && username.trim().length < 2) {
       setError('Choose a username with at least 2 characters.');
@@ -52,10 +54,30 @@ export default function Auth() {
         await login(email.trim(), password);
       } else {
         await signUp(email.trim(), password, username.trim());
+        setNotice('Account created. Check your inbox to verify your email before paying.');
       }
       navigate(from, { replace: true });
     } catch (authError) {
       console.error('Authentication error', authError);
+      setError(authErrorMessage(authError));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setError('');
+    setNotice('');
+    if (!email.trim()) {
+      setError('Enter your email address first, then choose “Forgot password?”.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await resetPassword(email.trim());
+      setNotice('Password reset email sent. Check your inbox.');
+    } catch (authError) {
+      console.error('Password reset error', authError);
       setError(authErrorMessage(authError));
     } finally {
       setIsLoading(false);
@@ -118,6 +140,15 @@ export default function Auth() {
             </div>
           )}
 
+          {notice && (
+            <div
+              role="status"
+              className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm"
+            >
+              {notice}
+            </div>
+          )}
+
           <form onSubmit={handleAuth} className="space-y-4">
             {!isLogin && (
               <div className="relative">
@@ -169,6 +200,19 @@ export default function Auth() {
               />
             </div>
 
+            {isLogin && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => void handleReset()}
+                  disabled={isLoading}
+                  className="text-xs text-gray-400 hover:text-umnotho transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isLoading}
@@ -212,12 +256,25 @@ export default function Auth() {
             Continue with Google
           </button>
 
+          <p className="mt-6 text-center text-xs text-gray-500">
+            By continuing you agree to the{' '}
+            <Link to="/legal/terms" className="text-gray-400 underline hover:text-white">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link to="/legal/privacy" className="text-gray-400 underline hover:text-white">
+              Privacy notice
+            </Link>
+            .
+          </p>
+
           <div className="mt-8 text-center">
             <button
               type="button"
               onClick={() => {
                 setIsLogin((value) => !value);
                 setError('');
+                setNotice('');
               }}
               className="text-gray-400 hover:text-white transition-colors text-sm"
             >

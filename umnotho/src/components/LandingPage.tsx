@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowRight, ShieldCheck, RefreshCw, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import SiteFooter from './SiteFooter';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -108,6 +109,7 @@ const LandingPage: React.FC = () => {
           </div>
         </motion.div>
       </main>
+      <SiteFooter />
     </div>
   );
 };

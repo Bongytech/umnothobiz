@@ -58,11 +58,11 @@ jobs:
           fi
 
       - name: Install Cloud Functions dependencies
-        if: steps.credentials.outputs.ready == 'true'
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
         run: npm --prefix functions ci --no-audit --no-fund
 
       - name: Deploy Cloud Functions
-        if: steps.credentials.outputs.ready == 'true'
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
         env:
           SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

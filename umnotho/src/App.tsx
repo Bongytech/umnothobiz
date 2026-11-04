@@ -5,6 +5,7 @@ import Barter from './components/Barter';
 import Pricing from './components/Pricing';
 import MyBids from './components/MyBids';
 import Profile from './components/Profile';
+import LegalPage from './components/LegalPage';
 import { ProtectedRoute, PublicOnlyRoute } from './components/RouteGuards';
 
 export default function App() {
@@ -21,6 +22,9 @@ export default function App() {
           }
         />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/legal/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/legal/privacy" element={<LegalPage kind="privacy" />} />
+        <Route path="/legal/refunds" element={<LegalPage kind="refunds" />} />
         <Route
           path="/barter"
           element={

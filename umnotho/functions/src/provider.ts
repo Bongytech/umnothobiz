@@ -1,3 +1,4 @@
+import { NowPaymentsProvider } from './providers/nowpayments';
 import { SandboxProvider } from './providers/sandbox';
 import type { PaymentProvider } from './providers/types';
 
@@ -37,6 +38,10 @@ export function getProvider(): PaymentProvider {
       );
     }
     return new SandboxProvider();
+  }
+
+  if (name === 'nowpayments') {
+    return new NowPaymentsProvider();
   }
 
   throw new Error(`Unsupported crypto provider: ${name}`);

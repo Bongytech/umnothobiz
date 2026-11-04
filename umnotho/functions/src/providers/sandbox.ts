@@ -1,8 +1,9 @@
-import { isPaymentStatus, verifySandboxSignature } from '../core';
+import { quoteUsdt, verifySandboxSignature } from '../core';
 import type {
   CheckoutRequest,
   CheckoutSession,
   PaymentProvider,
+  Quote,
   WebhookEvent,
 } from './types';
 
@@ -17,6 +18,16 @@ export class SandboxProvider implements PaymentProvider {
   readonly id = 'sandbox';
   readonly label = 'Sandbox — no real funds';
   readonly sandbox = true;
+  readonly ttlMinutes = 30;
+
+  async quote(amountZar: number): Promise<Quote> {
+    const raw = Number(process.env.SANDBOX_ZAR_PER_USDT ?? '18.5');
+    const rate = Number.isFinite(raw) && raw > 0 ? raw : 18.5;
+    return {
+      amountUsdt: quoteUsdt(amountZar, rate),
+      rateZarPerUsdt: rate,
+    };
+  }
 
   async createCheckout(request: CheckoutRequest): Promise<CheckoutSession> {
     return {
@@ -45,13 +56,14 @@ export class SandboxProvider implements PaymentProvider {
     if (typeof paymentId !== 'string' || paymentId.length === 0) {
       throw new Error('Webhook payload is missing paymentId');
     }
-    if (!isPaymentStatus(status) || status === 'pending') {
+    if (status !== 'paid' && status !== 'failed' && status !== 'expired' && status !== 'pending') {
       throw new Error('Webhook payload has an unsupported status');
     }
 
     return {
       paymentId,
       status,
+      providerStatus: status,
       txHash: typeof payload.txHash === 'string' ? payload.txHash : undefined,
       amountUsdt:
         typeof payload.amountUsdt === 'number' && Number.isFinite(payload.amountUsdt)

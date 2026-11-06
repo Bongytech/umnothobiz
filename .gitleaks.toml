@@ -8,15 +8,15 @@ paths = [
   "test/",
   "__tests__/",
   "__mocks__/",
-  "*.test.ts",
-  "*.spec.ts",
-  "*.test.js",
-  "*.spec.js",
-  ".github/workflows/",  # Workflow files may contain example patterns
-  "docs/",               # Documentation examples and placeholders
-  "umnotho/.env.example",
-  "umnotho/functions/.env.example",
-  "SECURITY-SETUP.md"    # Documentation with examples
+  ".*\\.test\\.ts$",
+  ".*\\.spec\\.ts$",
+  ".*\\.test\\.js$",
+  ".*\\.spec\\.js$",
+  "\\.github/workflows/",
+  "docs/",
+  "umnotho/\\.env\\.example$",
+  "umnotho/functions/\\.env\\.example$",
+  "SECURITY-SETUP\\.md$"
 ]
 
 [[rules]]

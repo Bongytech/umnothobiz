@@ -1,0 +1,100 @@
+name: Security scan
+
+# Scheduled, full-depth checks that are too slow for every pull request: the
+# entire git history is scanned for credentials, dependency advisories are
+# re-read (new CVEs against unchanged code are common), and a CycloneDX SBOM is
+# produced for supply-chain review.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: umnotho
+
+jobs:
+  history:
+    name: Full-history secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks over all commits
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/repo \
+            -v "$PWD:/repo" \
+            ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            detect --source /repo --config /repo/.gitleaks.toml \
+            --no-banner --redact --verbose
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: Audit application runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit Cloud Functions runtime dependencies
+        run: npm --prefix functions audit --omit=dev --audit-level=high
+
+      - name: Report development-dependency advisories
+        # Development tooling does not ship to users, so this is advisory only.
+        continue-on-error: true
+        run: |
+          {
+            echo "### Development dependency advisories"
+            echo ""
+            echo '```'
+            npm audit --audit-level=low || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sbom:
+    name: Software bill of materials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: Generate CycloneDX SBOMs
+        run: |
+          set -euo pipefail
+          npm sbom --sbom-format cyclonedx > ../sbom-app.cdx.json
+          npm --prefix functions sbom --sbom-format cyclonedx > ../sbom-functions.cdx.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sbom
+          path: |
+            sbom-app.cdx.json
+            sbom-functions.cdx.json
+          retention-days: 90
+          if-no-files-found: error

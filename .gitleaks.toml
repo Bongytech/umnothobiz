@@ -1,90 +1,45 @@
-title = "Unmotho Firebase Security Configuration"
-version = "2.0.0"
+# Secret scanning for the Umnotho repository.
+#
+# The upstream gitleaks ruleset is included with `useDefault = true` because it
+# is actively maintained and tuned to avoid noise. The rules below only add
+# coverage for credentials this project can actually hold. Do not replace the
+# default ruleset with a hand-written one: broad regexes such as "any quoted
+# 32-character string" flag ordinary identifiers and train people to ignore
+# alerts.
 
-[allowlist]
-description = "Allowlisted test files and patterns"
-paths = [
-  "tests/",
-  "test/",
-  "__tests__/",
-  "__mocks__/",
-  ".*\\.test\\.ts$",
-  ".*\\.spec\\.ts$",
-  ".*\\.test\\.js$",
-  ".*\\.spec\\.js$",
-  "\\.github/workflows/",
-  "docs/",
-  "umnotho/\\.env\\.example$",
-  "umnotho/functions/\\.env\\.example$",
-  "SECURITY-SETUP\\.md$"
-]
+title = "Umnotho secret scanning"
 
-[[rules]]
-id = "firebase-api-key"
-description = "Firebase Web API Key"
-regex = '''AIza[0-9A-Za-z\\-_]{35}'''
-tags = ["firebase", "api-key", "critical"]
-keywords = ["apiKey", "firebase", "AIza"]
+[extend]
+useDefault = true
 
 [[rules]]
 id = "firebase-service-account"
-description = "Firebase Service Account JSON"
-regex = '''"type":\s*"service_account"'''
-tags = ["firebase", "service-account", "critical"]
-keywords = ["service_account", "private_key"]
+description = "Google service account JSON (Firebase deploy credential)"
+regex = '''"type"\s*:\s*"service_account"'''
+keywords = ["service_account"]
+tags = ["google", "firebase", "credential"]
 
 [[rules]]
-id = "firebase-config-secrets"
-description = "Firebase configuration with hardcoded values"
-regex = '''apiKey\s*:\s*["'][^"']{20,}["']'''
-tags = ["firebase", "config", "secret"]
-keywords = ["apiKey", "authDomain", "projectId"]
+id = "nowpayments-api-key"
+description = "NOWPayments API key"
+regex = '''(?i)nowpayments_api_key\s*[=:]\s*["']?[A-Z0-9]{8,}-[A-Z0-9-]{8,}["']?'''
+keywords = ["nowpayments_api_key"]
+tags = ["nowpayments", "payments", "credential"]
 
 [[rules]]
-id = "environment-secrets"
-description = "Environment variable assignments with secrets"
-regex = '''(VITE_|FIREBASE_|REACT_APP_)[A-Z_]+=["'][^"']{10,}["']'''
-tags = ["env", "secret", "environment"]
+id = "nowpayments-ipn-secret"
+description = "NOWPayments IPN signing secret"
+regex = '''(?i)nowpayments_ipn_secret\s*[=:]\s*["']?[A-Za-z0-9+/=]{16,}["']?'''
+keywords = ["nowpayments_ipn_secret"]
+tags = ["nowpayments", "payments", "credential"]
 
-[[rules]]
-id = "stripe-secret-key"
-description = "Stripe Secret Key"
-regex = '''(sk|rk)_(test|live)_[0-9a-zA-Z]{24,99}'''
-tags = ["stripe", "payment", "critical"]
-
-[[rules]]
-id = "generic-api-key"
-description = "Generic API Key Pattern"
-regex = '''["'][0-9a-zA-Z]{32,45}["']'''
-tags = ["api-key", "generic"]
-entropy = 3.5
-
-[[rules]]
-id = "jwt-secret"
-description = "JWT Secret or Private Key"
-regex = '''-----BEGIN (?:RSA|EC|DSA|PRIVATE) KEY-----'''
-tags = ["jwt", "crypto", "private-key", "critical"]
-
-[[rules]]
-id = "password-in-code"
-description = "Hardcoded password in source code"
-regex = '''password\s*[=:]\s*["'][^"']{4,}["']'''
-tags = ["password", "credential"]
-
-[[rules]]
-id = "database-url"
-description = "Database connection URL with credentials"
-regex = '''(mysql|postgres|mongodb)://[^:]+:[^@]+@'''
-tags = ["database", "credentials", "critical"]
-
-[[rules]]
-id = "aws-credentials"
-description = "AWS Access Key ID and Secret"
-regex = '''(AKIA|ASIA)[A-Z0-9]{16}'''
-tags = ["aws", "credentials", "critical"]
-
-[[rules]]
-id = "google-oauth"
-description = "Google OAuth Client Secret"
-regex = '''["']client_secret["']\s*:\s*["'][^"']{10,}["']'''
-tags = ["google", "oauth", "critical"]
+[allowlist]
+description = "Third-party skill documentation and dependency lockfile hashes"
+paths = [
+  # Vendored agent-skill references, not project code. These are documentation
+  # snippets that contain sample passwords and package checksums.
+  '''^umnotho/\.agents/skills/''',
+  # Lockfiles store base64 integrity hashes, not credentials.
+  '''^umnotho/package-lock\.json$''',
+  '''^umnotho/functions/package-lock\.json$''',
+]

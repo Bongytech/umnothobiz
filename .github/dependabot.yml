@@ -30,3 +30,21 @@ updates:
       functions-dependencies:
         patterns:
           - '*'
+
+  # Workflows are pinned to commit SHAs. This keeps those pins current without
+  # anyone having to remember to bump them by hand.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+      - ci
+    groups:
+      github-actions:
+        patterns:
+          - '*'

@@ -32,6 +32,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [canContinue, setCanContinue] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,6 +43,7 @@ export default function Auth() {
     event.preventDefault();
     setError('');
     setNotice('');
+    setCanContinue(false);
 
     if (!isLogin && username.trim().length < 2) {
       setError('Choose a username with at least 2 characters.');
@@ -52,11 +54,13 @@ export default function Auth() {
     try {
       if (isLogin) {
         await login(email.trim(), password);
+        navigate(from, { replace: true });
       } else {
         await signUp(email.trim(), password, username.trim());
         setNotice('Account created. Check your inbox to verify your email before paying.');
+        setCanContinue(true);
+        setIsLogin(true);
       }
-      navigate(from, { replace: true });
     } catch (authError) {
       console.error('Authentication error', authError);
       setError(authErrorMessage(authError));
@@ -68,6 +72,7 @@ export default function Auth() {
   const handleReset = async () => {
     setError('');
     setNotice('');
+    setCanContinue(false);
     if (!email.trim()) {
       setError('Enter your email address first, then choose “Forgot password?”.');
       return;
@@ -145,7 +150,16 @@ export default function Auth() {
               role="status"
               className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm"
             >
-              {notice}
+              <p>{notice}</p>
+              {canContinue && (
+                <button
+                  type="button"
+                  onClick={() => navigate(from, { replace: true })}
+                  className="mt-2 font-semibold text-white underline hover:text-umnotho"
+                >
+                  Continue to the market
+                </button>
+              )}
             </div>
           )}
 

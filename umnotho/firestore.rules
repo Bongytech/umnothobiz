@@ -43,7 +43,10 @@ service cloud.firestore {
 
     // ---------------------------------------------------------------- users
     match /users/{userId} {
-      allow read: if signedIn();
+      // Profile documents contain private contact data. Only the owner may
+      // read them; public display names are denormalised onto listings/bids.
+      allow get: if isSelf(userId);
+      allow list: if false;
 
       allow create: if isSelf(userId)
         && request.resource.data.keys().hasOnly(['displayName', 'email', 'ratings', 'createdAt'])
@@ -183,6 +186,7 @@ service cloud.firestore {
         && (isMessageAppend() || isOwnerStatusChange());
 
       allow delete: if signedIn()
+        && resource.data.status == 'Pending'
         && (resource.data.bidderId == request.auth.uid
           || resource.data.ownerId == request.auth.uid);
 

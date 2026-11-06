@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  limit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -101,8 +102,16 @@ export default function MyBids() {
   useEffect(() => {
     if (!user) return;
 
-    const receivedQuery = query(collection(db, 'activeBids'), where('ownerId', '==', user.uid));
-    const placedQuery = query(collection(db, 'activeBids'), where('bidderId', '==', user.uid));
+    const receivedQuery = query(
+      collection(db, 'activeBids'),
+      where('ownerId', '==', user.uid),
+      limit(100),
+    );
+    const placedQuery = query(
+      collection(db, 'activeBids'),
+      where('bidderId', '==', user.uid),
+      limit(100),
+    );
 
     const sortByRecent = (bids: Bid[]) =>
       [...bids].sort(
@@ -241,7 +250,7 @@ export default function MyBids() {
         [`ratings.${user.uid}`]: ratingScore,
       });
       setRatingBid(null);
-      setNotice({ tone: 'success', text: 'Thanks â€” your rating has been saved.' });
+      setNotice({ tone: 'success', text: 'Thanks — your rating has been saved.' });
     } catch (error) {
       console.error('Could not save rating:', error);
       const code = (error as { code?: string } | null)?.code;
@@ -322,7 +331,7 @@ export default function MyBids() {
           <div className="flex gap-2 mb-4">
             <input
               type="text"
-              placeholder="Type a messageâ€¦"
+              placeholder="Type a message…"
               value={messages[bid.id] ?? ''}
               maxLength={1000}
               onChange={(event) =>
@@ -346,8 +355,13 @@ export default function MyBids() {
         {open && (
           <div className="flex flex-wrap gap-2 mt-auto">
             {role === 'owner' ? (
-              <>
-                {bid.status === 'Pending' && (
+              bid.status === 'Completed' || bid.status === 'Declined' ? (
+                <p className="text-sm text-gray-400">
+                  This trade is {bid.status.toLowerCase()} and cannot be changed.
+                </p>
+              ) : (
+                <>
+                  {bid.status === 'Pending' && (
                   <button
                     type="button"
                     onClick={() => handleUpdateStatus(bid, 'In Negotiation')}
@@ -374,7 +388,8 @@ export default function MyBids() {
                   Decline offer
                 </button>
               </>
-            ) : (
+            )
+            ) : bid.status === 'Pending' ? (
               <button
                 type="button"
                 onClick={() => handleWithdraw(bid)}
@@ -383,7 +398,7 @@ export default function MyBids() {
               >
                 Withdraw offer
               </button>
-            )}
+            ) : null}
           </div>
         )}
 
@@ -407,7 +422,7 @@ export default function MyBids() {
     return (
       <div className="min-h-screen bg-dark-950">
         <AppNav active="my-bids" />
-        <FullPageLoader label="Loading your offersâ€¦" />
+        <FullPageLoader label="Loading your offers…" />
       </div>
     );
   }
@@ -565,7 +580,7 @@ export default function MyBids() {
                   disabled={savingRating}
                   className="w-full py-3 bg-umnotho text-dark-950 font-semibold rounded-xl hover:bg-umnotho-hover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  <Check className="w-5 h-5" /> {savingRating ? 'Savingâ€¦' : 'Submit rating'}
+                  <Check className="w-5 h-5" /> {savingRating ? 'Saving…' : 'Submit rating'}
                 </button>
               </form>
             </motion.div>

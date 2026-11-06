@@ -4,6 +4,7 @@ version = "2.0.0"
 [allowlist]
 description = "Allowlisted test files and patterns"
 paths = [
+  "tests/",
   "test/",
   "__tests__/",
   "__mocks__/",
@@ -12,6 +13,9 @@ paths = [
   "*.test.js",
   "*.spec.js",
   ".github/workflows/",  # Workflow files may contain example patterns
+  "docs/",               # Documentation examples and placeholders
+  "umnotho/.env.example",
+  "umnotho/functions/.env.example",
   "SECURITY-SETUP.md"    # Documentation with examples
 ]
 

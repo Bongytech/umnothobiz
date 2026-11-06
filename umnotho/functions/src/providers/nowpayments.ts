@@ -172,6 +172,34 @@ export class NowPaymentsProvider implements PaymentProvider {
     };
   }
 
+  async fetchPaymentStatus(
+    providerPaymentId: string,
+    paymentId: string,
+  ): Promise<WebhookEvent | null> {
+    const response = await fetch(
+      `${apiUrl()}/payment/${encodeURIComponent(providerPaymentId)}`,
+      {
+        headers: { 'x-api-key': apiKey() },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+
+    if (!response.ok) return null;
+
+    const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    const actual = Number(body.actually_paid ?? body.pay_amount);
+
+    return {
+      paymentId: typeof body.order_id === 'string' ? body.order_id : paymentId,
+      status: mapNowPaymentsStatus(body.payment_status),
+      providerStatus:
+        typeof body.payment_status === 'string' ? body.payment_status : undefined,
+      providerPaymentId,
+      amountUsdt: Number.isFinite(actual) && actual > 0 ? actual : undefined,
+      txHash: typeof body.payin_hash === 'string' ? body.payin_hash : undefined,
+    };
+  }
+
   parseWebhook(rawBody: Buffer | string, signature: string): WebhookEvent {
     const body = rawBody.toString();
 

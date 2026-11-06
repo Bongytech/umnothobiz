@@ -60,14 +60,15 @@ config/secrets in production. They are **never** committed.
 | Variable | Purpose |
 | :--- | :--- |
 | `CRYPTO_PROVIDER` | Provider id (`sandbox` in emulator, `nowpayments` in production) |
-| `ALLOW_SANDBOX_PAYMENTS` | Must be `true` only for local sandbox; never in production |
+| `ALLOW_SANDBOX_PAYMENTS` | Only for emulator or an allowlisted non-production project; never production |
+| `SANDBOX_PROJECT_ALLOWLIST` | Comma-separated non-production project ids allowed to run the sandbox |
 | `NOWPAYMENTS_API_URL` | NOWPayments API base, e.g. `https://api.nowpayments.io/v1` |
 | `NOWPAYMENTS_PAY_CURRENCY` | Pay currency, default `usdttrc20` |
 | `CRYPTO_WEBHOOK_URL` | Public `cryptoWebhook` URL used in the NOWPayments invoice |
 | `APP_URL` | Public app URL for success/cancel redirects |
 | `REQUIRE_VERIFIED_EMAIL` | Set `true` to block checkout until the email is verified |
 | `ENFORCE_APP_CHECK` | Set `true` to require App Check tokens on callables |
-| `USE_SECRET_MANAGER` | Set `true` to bind credentials from Secret Manager; leave false to use Functions env vars |
+| `USE_SECRET_MANAGER` | Production NOWPayments requires `true`; local/staging may use false |
 | `NOWPAYMENTS_API_KEY` | API key (Secret Manager or Functions env; never commit) |
 | `NOWPAYMENTS_IPN_SECRET` | IPN signing secret (Secret Manager or Functions env; never commit) |
 | `SANDBOX_ZAR_PER_USDT` | Sandbox quote rate, e.g. `18.50` |
@@ -75,14 +76,15 @@ config/secrets in production. They are **never** committed.
 | `SANDBOX_NETWORK` | Sandbox network label |
 | `SANDBOX_WEBHOOK_SECRET` | HMAC secret for the sandbox webhook |
 
-`NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` must be Firebase Functions
-secrets or Functions environment variables, never `.env` files or git. For
-emulator-only placeholder secrets, use `functions/.secret.local` (ignored).
+`NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` must be Secret Manager
+secrets in production. The environment-variable fallback is for local/staging
+only; `getProvider()` refuses `nowpayments` in a deployed environment unless
+`USE_SECRET_MANAGER=true`. For emulator-only placeholders, use
+`functions/.secret.local` (ignored).
 
-If `firebase deploy` reports that the Secret Manager API is disabled, either
-enable it (`gcloud services enable secretmanager.googleapis.com`) or leave
-`USE_SECRET_MANAGER` false and use the environment-variable fallback. The adapter
-reads both paths from `process.env`.
+If `firebase deploy` reports that the Secret Manager API is disabled, enable it
+with `gcloud services enable secretmanager.googleapis.com`. Production checkout
+will not start until the secrets exist.
 
 `FUNCTIONS_EMULATOR=true` is set automatically by the emulator and enables the
 sandbox provider. A deployed function with no `CRYPTO_PROVIDER` refuses checkout.

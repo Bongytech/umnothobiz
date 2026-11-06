@@ -80,6 +80,8 @@ These fields are written only by the Admin SDK inside `settlePayment()`.
 | `getCryptoCheckout` | Callable | Required | Owner-only status polling |
 | `confirmSandboxPayment` | Callable | Required | Local-only simulation through the same settlement path |
 | `cryptoWebhook` | HTTPS | Provider signature | Verify and settle a real payment |
+| `reconcileCryptoPayments` | Scheduled | Cloud Scheduler | Reconcile missed webhooks and expire abandoned checkouts |
+| `deleteMyAccount` | Callable | Required + recent sign-in | Delete profile/Auth and anonymise trade history |
 
 Rate limiting: five checkout creations per UID per 15 minutes (`rateLimits`
 collection, Admin SDK only).
@@ -135,11 +137,11 @@ dummy values (ignored by git).
 
    Set `USE_SECRET_MANAGER=true` in the Functions environment.
 
-   **B. Free environment-variable fallback.** Leave `USE_SECRET_MANAGER` unset or
+   **B. Environment-variable fallback.** Leave `USE_SECRET_MANAGER` unset or
    `false`, and put `NOWPAYMENTS_API_KEY` / `NOWPAYMENTS_IPN_SECRET` in
    `functions/.env.<project-id>` (or the Firebase console). The file is ignored
-   by git. This avoids the Secret Manager API entirely, but the values are less
-   isolated than Secret Manager; move to option A before a public launch.
+   by git. Use this for local/staging only: the deployed production provider
+   refuses to start without Secret Manager.
 
 3. Set non-secret Functions environment values in `functions/.env.<project-id>`
    (or the Firebase console):

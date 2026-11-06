@@ -8,6 +8,7 @@ import {
   getDocs,
   limit,
   onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   Timestamp,
@@ -129,7 +130,7 @@ export default function Barter() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      query(collection(db, 'barterItems')),
+      query(collection(db, 'barterItems'), orderBy('createdAt', 'desc'), limit(100)),
       (snapshot) => {
         setItems(snapshot.docs.map((itemDoc) => normalizeItem(itemDoc.id, itemDoc.data())));
         setLoadError('');
@@ -409,7 +410,7 @@ export default function Barter() {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder={isMine ? 'Ask a question about your listingâ€¦' : 'Ask the trader a questionâ€¦'}
+              placeholder={isMine ? 'Ask a question about your listing…' : 'Ask the trader a question…'}
               value={inquiryValue}
               maxLength={1000}
               onChange={(event) =>
@@ -463,7 +464,7 @@ export default function Barter() {
                   {inquiry.createdAt ? (
                     <span className="text-gray-500 font-normal">
                       {' '}
-                      Â· {inquiry.createdAt.toLocaleDateString()}
+                      · {inquiry.createdAt.toLocaleDateString()}
                     </span>
                   ) : null}
                 </span>
@@ -483,7 +484,7 @@ export default function Barter() {
     return (
       <div className="min-h-screen bg-dark-950">
         <AppNav active="barter" />
-        <FullPageLoader label="Loading the exchange marketâ€¦" />
+        <FullPageLoader label="Loading the exchange market…" />
       </div>
     );
   }
@@ -750,7 +751,7 @@ export default function Barter() {
                   disabled={savingItem}
                   className="w-full py-3 mt-4 bg-umnotho text-dark-950 font-semibold rounded-xl hover:bg-umnotho-hover transition-colors disabled:opacity-60"
                 >
-                  {savingItem ? 'Postingâ€¦' : 'Post listing'}
+                  {savingItem ? 'Posting…' : 'Post listing'}
                 </button>
               </form>
             </motion.div>
@@ -783,7 +784,7 @@ export default function Barter() {
               </h2>
               <p className="text-gray-400 text-sm mb-6">
                 For <span className="text-white">{bidItem.name}</span> by {bidItem.ownerName}. Say
-                what you will trade â€” cash, goods, a service, or a combination.
+                what you will trade — cash, goods, a service, or a combination.
               </p>
 
               <form onSubmit={handlePlaceBid} className="space-y-4" noValidate>
@@ -801,7 +802,7 @@ export default function Barter() {
                   disabled={placingBid}
                   className="w-full py-3 bg-umnotho text-dark-950 font-semibold rounded-xl hover:bg-umnotho-hover transition-colors disabled:opacity-60"
                 >
-                  {placingBid ? 'Sendingâ€¦' : 'Send offer'}
+                  {placingBid ? 'Sending…' : 'Send offer'}
                 </button>
               </form>
             </motion.div>

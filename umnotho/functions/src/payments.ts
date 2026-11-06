@@ -1,11 +1,11 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from './admin';
-import { isExpired, paymentExpiry } from './core';
+import { paymentExpiry } from './core';
 import { PLANS, isPlanId } from './plans';
 import type { PlanId } from './plans';
 import { getProvider, isSandbox, sandboxAllowed } from './provider';
 import { assertCheckoutRateLimit } from './rateLimit';
-import type { WebhookEvent } from './providers/types';
+import type { CheckoutSession, WebhookEvent } from './providers/types';
 
 export type PaymentErrorCode =
   | 'invalid-plan'
@@ -113,29 +113,24 @@ export async function createCheckout(ownerId: string, planId: unknown): Promise<
   const now = Timestamp.now();
   const expiresAt = Timestamp.fromDate(paymentExpiry(now.toMillis(), provider.ttlMinutes));
 
-  const session = await provider.createCheckout({
-    paymentId,
-    ownerId,
-    plan,
-    amountUsdt: quote.amountUsdt,
-    rateZarPerUsdt: quote.rateZarPerUsdt,
-  });
-
-  const payment = {
+  // Write the pending document before asking the provider for an invoice. A
+  // fast webhook can then always find the record, and a failed invoice does not
+  // leave an orphaned provider payment.
+  const pending = {
     ownerId,
     plan: plan.id,
     planName: plan.name,
     amountZar: plan.amountZar,
     amountUsdt: quote.amountUsdt,
     rateZarPerUsdt: quote.rateZarPerUsdt,
-    provider: session.provider,
-    providerLabel: session.providerLabel,
-    providerPaymentId: session.providerPaymentId,
-    providerStatus: 'waiting',
+    provider: provider.id,
+    providerLabel: provider.label,
+    providerPaymentId: null,
+    providerStatus: 'creating',
     status: 'pending' as const,
-    address: session.address ?? null,
-    network: session.network,
-    checkoutUrl: session.checkoutUrl ?? null,
+    address: null,
+    network: '',
+    checkoutUrl: null,
     reference: paymentId,
     createdAt: now,
     updatedAt: now,
@@ -144,8 +139,58 @@ export async function createCheckout(ownerId: string, planId: unknown): Promise<
     txHash: null,
   };
 
-  await paymentRef.set(payment);
-  return toResponse(paymentId, payment);
+  await paymentRef.set(pending);
+
+  let session: CheckoutSession;
+  try {
+    session = await provider.createCheckout({
+      paymentId,
+      ownerId,
+      plan,
+      amountUsdt: quote.amountUsdt,
+      rateZarPerUsdt: quote.rateZarPerUsdt,
+    });
+  } catch (error) {
+    console.error('Provider checkout creation failed:', error);
+    await paymentRef.update({
+      status: 'failed',
+      providerStatus: 'create-failed',
+      updatedAt: Timestamp.now(),
+    });
+    throw new PaymentError('unavailable', 'Could not create the crypto checkout. Try again.');
+  }
+
+  const completed = {
+    ...pending,
+    provider: session.provider,
+    providerLabel: session.providerLabel,
+    providerPaymentId: session.providerPaymentId,
+    providerStatus: 'waiting',
+    address: session.address ?? null,
+    network: session.network,
+    checkoutUrl: session.checkoutUrl ?? null,
+    updatedAt: Timestamp.now(),
+  };
+
+  try {
+    await paymentRef.update({
+      provider: completed.provider,
+      providerLabel: completed.providerLabel,
+      providerPaymentId: completed.providerPaymentId,
+      providerStatus: completed.providerStatus,
+      address: completed.address,
+      network: completed.network,
+      checkoutUrl: completed.checkoutUrl,
+      updatedAt: completed.updatedAt,
+    });
+  } catch (error) {
+    // The invoice exists and the pending document is still present. A webhook
+    // can settle it; surface an error so the client can retry or contact support.
+    console.error('Could not attach provider details to payment:', error);
+    throw new PaymentError('unavailable', 'The payment was created but could not be displayed. Contact support.');
+  }
+
+  return toResponse(paymentId, completed);
 }
 
 export async function getCheckout(ownerId: string, paymentId: unknown): Promise<CheckoutResponse> {
@@ -181,20 +226,15 @@ export async function confirmSandbox(ownerId: string, paymentId: unknown): Promi
   const payment = await getCheckout(ownerId, paymentId);
 
   if (payment.status === 'paid') return payment;
-  if (payment.status !== 'pending') {
+  if (payment.status !== 'pending' && payment.status !== 'expired') {
     throw new PaymentError('expired', 'This checkout is no longer payable.');
-  }
-  if (payment.expiresAt && isExpired(new Date(payment.expiresAt))) {
-    await db.collection('payments').doc(payment.paymentId).update({
-      status: 'expired',
-      updatedAt: Timestamp.now(),
-    });
-    throw new PaymentError('expired', 'This checkout has expired.');
   }
 
   await settlePayment(payment.paymentId, {
     paymentId: payment.paymentId,
     status: 'paid',
+    providerStatus: 'finished',
+    amountUsdt: payment.amountUsdt,
     txHash: `sandbox-${payment.paymentId}`,
   });
 
@@ -222,11 +262,90 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
 
     const data = snapshot.data() as Record<string, unknown>;
     if (data.status === 'paid') return;
-    if (data.status !== 'pending') return;
+    if (data.status !== 'pending' && !(data.status === 'expired' && event.status === 'paid')) {
+      return;
+    }
 
     const now = Timestamp.now();
     const expiresAt = data.expiresAt;
-    if (expiresAt instanceof Timestamp && expiresAt.toMillis() <= now.toMillis()) {
+    const late = expiresAt instanceof Timestamp && expiresAt.toMillis() <= now.toMillis();
+
+    // A positive provider verdict always wins over the local checkout TTL. The
+    // customer may have paid just before expiry and the chain confirmed late.
+    if (event.status === 'paid') {
+      const expectedUsdt = Number(data.amountUsdt);
+      if (typeof event.amountUsdt !== 'number' || !Number.isFinite(event.amountUsdt)) {
+        transaction.update(paymentRef, {
+          status: 'failed',
+          providerStatus: event.providerStatus ?? 'amount-missing',
+          providerMessage: 'Provider did not report the paid amount.',
+          updatedAt: now,
+          txHash: event.txHash ?? null,
+        });
+        return;
+      }
+
+      const tolerance = Math.max(0.01, expectedUsdt * 0.02);
+      if (event.amountUsdt < expectedUsdt - tolerance) {
+        transaction.update(paymentRef, {
+          status: 'failed',
+          providerStatus: event.providerStatus ?? 'underpaid',
+          amountReceived: event.amountUsdt,
+          providerMessage: 'Paid amount was below the quoted amount.',
+          updatedAt: now,
+          txHash: event.txHash ?? null,
+        });
+        return;
+      }
+
+      const planId = data.plan;
+      if (!isPlanId(planId)) throw new Error('Payment has an unknown plan');
+
+      const plan = PLANS[planId];
+      const ownerId = data.ownerId;
+      if (typeof ownerId !== 'string' || ownerId.length === 0) {
+        throw new Error('Payment has no owner');
+      }
+
+      const userRef = db.collection('users').doc(ownerId);
+      const userSnapshot = await transaction.get(userRef);
+      const currentExpiry = userSnapshot.data()?.subscriptionExpiresAt;
+      const extensionStart =
+        currentExpiry instanceof Timestamp && currentExpiry.toMillis() > now.toMillis()
+          ? currentExpiry
+          : now;
+      const newExpiry = Timestamp.fromMillis(
+        extensionStart.toMillis() + plan.durationDays * DAY_MS,
+      );
+
+      transaction.update(paymentRef, {
+        status: 'paid',
+        providerStatus: event.providerStatus ?? 'finished',
+        providerPaymentId: event.providerPaymentId ?? data.providerPaymentId ?? null,
+        amountReceived: event.amountUsdt,
+        overpaid: event.amountUsdt > expectedUsdt + tolerance,
+        latePayment: late,
+        paidAt: now,
+        updatedAt: now,
+        txHash: event.txHash ?? null,
+      });
+
+      transaction.set(
+        userRef,
+        {
+          subscriptionTier: plan.id,
+          subscriptionStatus: 'active',
+          subscriptionStartedAt: userSnapshot.data()?.subscriptionStartedAt ?? now,
+          subscriptionRenewedAt: now,
+          subscriptionExpiresAt: newExpiry,
+          lastPaymentId: paymentId,
+        },
+        { merge: true },
+      );
+      return;
+    }
+
+    if (late) {
       transaction.update(paymentRef, { status: 'expired', updatedAt: now });
       return;
     }
@@ -240,67 +359,11 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
       return;
     }
 
-    if (event.status !== 'paid') {
-      transaction.update(paymentRef, {
-        status: event.status,
-        providerStatus: event.providerStatus ?? event.status,
-        updatedAt: now,
-        txHash: event.txHash ?? null,
-      });
-      return;
-    }
-
-    const expectedUsdt = Number(data.amountUsdt);
-    if (
-      typeof event.amountUsdt === 'number' &&
-      Math.abs(event.amountUsdt - expectedUsdt) > Math.max(0.01, expectedUsdt * 0.02)
-    ) {
-      transaction.update(paymentRef, {
-        status: 'failed',
-        providerStatus: event.providerStatus ?? 'amount-mismatch',
-        updatedAt: now,
-        txHash: event.txHash ?? null,
-      });
-      return;
-    }
-
-    const planId = data.plan;
-    if (!isPlanId(planId)) throw new Error('Payment has an unknown plan');
-
-    const plan = PLANS[planId];
-    const ownerId = data.ownerId;
-    if (typeof ownerId !== 'string' || ownerId.length === 0) {
-      throw new Error('Payment has no owner');
-    }
-
-    const userRef = db.collection('users').doc(ownerId);
-    const userSnapshot = await transaction.get(userRef);
-    const currentExpiry = userSnapshot.data()?.subscriptionExpiresAt;
-    const startedAt =
-      currentExpiry instanceof Timestamp && currentExpiry.toMillis() > now.toMillis()
-        ? currentExpiry
-        : now;
-    const newExpiry = Timestamp.fromMillis(startedAt.toMillis() + plan.durationDays * DAY_MS);
-
     transaction.update(paymentRef, {
-      status: 'paid',
-      providerStatus: event.providerStatus ?? 'finished',
-      providerPaymentId: event.providerPaymentId ?? data.providerPaymentId ?? null,
-      paidAt: now,
+      status: event.status,
+      providerStatus: event.providerStatus ?? event.status,
       updatedAt: now,
       txHash: event.txHash ?? null,
     });
-
-    transaction.set(
-      userRef,
-      {
-        subscriptionTier: plan.id,
-        subscriptionStatus: 'active',
-        subscriptionStartedAt: now,
-        subscriptionExpiresAt: newExpiry,
-        lastPaymentId: paymentId,
-      },
-      { merge: true },
-    );
   });
 }

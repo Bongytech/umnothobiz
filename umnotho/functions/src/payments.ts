@@ -246,10 +246,12 @@ export async function handleWebhook(event: WebhookEvent): Promise<void> {
 }
 
 /**
- * Idempotent payment settlement. A payment can only move from pending to a
- * terminal state once, and only a paid event activates a plan.
+ * Idempotent payment settlement. A payment settles at most once, and only a
+ * verified paid event activates a plan. A `failed` or `expired` payment can
+ * still be settled by a later paid event, so a late or corrected IPN never
+ * leaves a paying customer without a plan.
  */
-async function settlePayment(paymentId: string, event: WebhookEvent): Promise<void> {
+export async function settlePayment(paymentId: string, event: WebhookEvent): Promise<void> {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(paymentId)) {
     throw new Error('Invalid payment id');
   }
@@ -262,9 +264,14 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
 
     const data = snapshot.data() as Record<string, unknown>;
     if (data.status === 'paid') return;
-    if (data.status !== 'pending' && !(data.status === 'expired' && event.status === 'paid')) {
-      return;
-    }
+
+    // A provider verdict of `paid` is authoritative even when it arrives after
+    // the local expiry, or after an earlier event was rejected for a missing
+    // amount. The amount checks below still decide whether it is safe to
+    // settle, so a late or corrected IPN can rescue a payment instead of
+    // leaving the customer paid-but-unprovisioned.
+    const maySettle = data.status === 'pending' || event.status === 'paid';
+    if (!maySettle) return;
 
     const now = Timestamp.now();
     const expiresAt = data.expiresAt;
@@ -325,6 +332,9 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
         amountReceived: event.amountUsdt,
         overpaid: event.amountUsdt > expectedUsdt + tolerance,
         latePayment: late,
+        // Record when a terminal-looking payment was rescued, so late or
+        // corrected settlements can be alerted on and reconciled.
+        ...(data.status === 'pending' ? {} : { recoveredFrom: data.status }),
         paidAt: now,
         updatedAt: now,
         txHash: event.txHash ?? null,
@@ -345,7 +355,9 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
       return;
     }
 
-    if (late) {
+    // Only a checkout that is still pending can expire. A failed payment keeps
+    // its diagnostic status so reconciliation can decide what to do with it.
+    if (late && data.status === 'pending') {
       transaction.update(paymentRef, { status: 'expired', updatedAt: now });
       return;
     }

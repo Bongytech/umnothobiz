@@ -16,6 +16,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { AnimatePresence, motion } from 'motion/react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Gavel,
   MapPin,
@@ -110,6 +111,8 @@ function friendlyError(error: unknown, action: string): string {
 
 export default function Barter() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState<BarterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -127,6 +130,17 @@ export default function Barter() {
   const [offer, setOffer] = useState('');
   const [offerError, setOfferError] = useState('');
   const [placingBid, setPlacingBid] = useState(false);
+
+  // A previous route (for example the signup flow) can hand over a one-off
+  // message. Show it once, then clear the history entry so a refresh does not
+  // repeat it.
+  useEffect(() => {
+    const incoming = (location.state as { notice?: string } | null)?.notice;
+    if (!incoming) return;
+
+    setNotice({ tone: 'success', text: incoming });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(

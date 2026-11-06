@@ -172,6 +172,13 @@ The IPN handler verifies `x-nowpayments-sig`, maps `finished` to paid, keeps
 `partially_paid`/confirmation statuses pending, and rejects an amount more than 2%
 below the quote. It is idempotent and safe against duplicate IPNs.
 
+A verified `paid` event is authoritative even when it arrives after the local
+expiry, or after an earlier event was rejected for a missing amount: the payment
+is settled and marked `latePayment` / `recoveredFrom`. Overpayments settle and are
+flagged `overpaid` for follow-up; underpayments and amount-less events are marked
+`failed` and stay visible to the hourly reconciliation job, which re-checks
+`pending` and `failed` payments against the provider.
+
 ## Integrating another provider
 
 Implement `functions/src/providers/types.ts`:

@@ -165,7 +165,9 @@ export const cryptoWebhook = onRequest(withSecrets, async (request, response) =>
 /**
  * Hourly safety net for missed webhooks and abandoned checkouts.
  *
- * - Reconciles pending payments older than an hour against the provider.
+ * - Reconciles pending and failed payments older than an hour against the
+ *   provider. `failed` is included because an IPN that arrives without a usable
+ *   amount is parked there; a corrected provider status must still settle it.
  * - Marks checkouts expired only after a grace period, in a transaction that
  *   re-checks the current status so a paid webhook is never overwritten.
  */
@@ -181,7 +183,7 @@ export const reconcileCryptoPayments = onSchedule(
 
     const snapshot = await db
       .collection('payments')
-      .where('status', '==', 'pending')
+      .where('status', 'in', ['pending', 'failed'])
       .limit(100)
       .get();
     const now = Date.now();

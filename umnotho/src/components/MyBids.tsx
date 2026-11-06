@@ -355,13 +355,8 @@ export default function MyBids() {
         {open && (
           <div className="flex flex-wrap gap-2 mt-auto">
             {role === 'owner' ? (
-              bid.status === 'Completed' || bid.status === 'Declined' ? (
-                <p className="text-sm text-gray-400">
-                  This trade is {bid.status.toLowerCase()} and cannot be changed.
-                </p>
-              ) : (
-                <>
-                  {bid.status === 'Pending' && (
+              <>
+                {bid.status === 'Pending' && (
                   <button
                     type="button"
                     onClick={() => handleUpdateStatus(bid, 'In Negotiation')}
@@ -388,17 +383,28 @@ export default function MyBids() {
                   Decline offer
                 </button>
               </>
-            )
-            ) : bid.status === 'Pending' ? (
-              <button
-                type="button"
-                onClick={() => handleWithdraw(bid)}
-                disabled={busyBidId === bid.id}
-                className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-500/20 disabled:opacity-50"
-              >
-                Withdraw offer
-              </button>
-            ) : null}
+            ) : (
+              <div className="flex w-full flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateStatus(bid, 'Declined')}
+                  disabled={busyBidId === bid.id}
+                  className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-500/20 disabled:opacity-50"
+                >
+                  Decline offer
+                </button>
+                {bid.status === 'Pending' && (
+                  <button
+                    type="button"
+                    onClick={() => handleWithdraw(bid)}
+                    disabled={busyBidId === bid.id}
+                    className="flex-1 py-2 bg-dark-800 hover:bg-dark-700 text-gray-300 text-sm font-medium rounded-lg transition-colors border border-white/10 disabled:opacity-50"
+                  >
+                    Withdraw offer
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

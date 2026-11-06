@@ -181,7 +181,7 @@ export const reconcileCryptoPayments = onSchedule(
 
     const snapshot = await db
       .collection('payments')
-      .where('status', '==', 'pending')
+      .where('status', 'in', ['pending', 'failed'])
       .limit(100)
       .get();
     const now = Date.now();

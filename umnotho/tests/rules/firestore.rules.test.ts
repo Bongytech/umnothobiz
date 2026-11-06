@@ -260,6 +260,36 @@ describe('activeBids', () => {
     );
   });
 
+  it('lets the bidder decline an open offer without deleting its history', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'activeBids', 'bid1'), newBid());
+      await setDoc(doc(context.firestore(), 'activeBids', 'bid2'), {
+        ...newBid(),
+        status: 'In Negotiation',
+      });
+    });
+
+    const buyerDb = testEnv.authenticatedContext('buyer').firestore();
+    await assertSucceeds(
+      updateDoc(doc(buyerDb, 'activeBids', 'bid1'), {
+        status: 'Declined',
+        lastUpdated: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(buyerDb, 'activeBids', 'bid2'), {
+        status: 'Declined',
+        lastUpdated: new Date(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(buyerDb, 'activeBids', 'bid2'), {
+        status: 'Completed',
+        lastUpdated: new Date(),
+      }),
+    );
+  });
+
   it('lets the bidder withdraw a pending offer only', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'activeBids', 'bid1'), newBid());

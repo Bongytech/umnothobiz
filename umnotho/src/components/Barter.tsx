@@ -129,6 +129,14 @@ export default function Barter() {
   const [placingBid, setPlacingBid] = useState(false);
 
   useEffect(() => {
+    const pendingNotice = sessionStorage.getItem('umnotho.notice');
+    if (pendingNotice) {
+      setNotice({ tone: 'success', text: pendingNotice });
+      sessionStorage.removeItem('umnotho.notice');
+    }
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onSnapshot(
       query(collection(db, 'barterItems'), orderBy('createdAt', 'desc'), limit(100)),
       (snapshot) => {

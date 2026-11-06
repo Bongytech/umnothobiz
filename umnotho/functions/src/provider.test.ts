@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { sandboxAllowed } from './provider';
+import { getProvider, sandboxAllowed } from './provider';
 
 const original = {
   FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
@@ -7,6 +7,8 @@ const original = {
   SANDBOX_PROJECT_ALLOWLIST: process.env.SANDBOX_PROJECT_ALLOWLIST,
   GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
   GCP_PROJECT: process.env.GCP_PROJECT,
+  CRYPTO_PROVIDER: process.env.CRYPTO_PROVIDER,
+  USE_SECRET_MANAGER: process.env.USE_SECRET_MANAGER,
 };
 
 function restore(key: keyof typeof original): void {
@@ -21,6 +23,8 @@ beforeEach(() => {
   delete process.env.SANDBOX_PROJECT_ALLOWLIST;
   delete process.env.GCLOUD_PROJECT;
   delete process.env.GCP_PROJECT;
+  delete process.env.CRYPTO_PROVIDER;
+  delete process.env.USE_SECRET_MANAGER;
 });
 
 afterEach(() => {
@@ -51,5 +55,13 @@ describe('sandboxAllowed', () => {
     expect(sandboxAllowed()).toBe(false);
     process.env.ALLOW_SANDBOX_PAYMENTS = 'true';
     expect(sandboxAllowed()).toBe(true);
+  });
+
+  it('requires Secret Manager for deployed NOWPayments', () => {
+    process.env.CRYPTO_PROVIDER = 'nowpayments';
+    process.env.GCLOUD_PROJECT = 'umnotho-f71ba';
+    expect(() => getProvider()).toThrow(/Secret Manager/);
+    process.env.USE_SECRET_MANAGER = 'true';
+    expect(() => getProvider()).not.toThrow();
   });
 });

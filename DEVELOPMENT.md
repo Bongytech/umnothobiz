@@ -300,6 +300,12 @@ npm run deploy:functions
 This uses `firebase.functions.json`, so it does not re-deploy Hosting/Firestore.
 The local full emulator stack uses `firebase.emulators.json`.
 
+When the GitHub workflow deploys Functions, it writes
+`functions/.env.<project-id>` with `USE_SECRET_MANAGER=true` and
+`CRYPTO_PROVIDER=nowpayments`, and exports the same values to the deploy process
+so Secret Manager bindings are generated. The two secrets must exist before that
+step, or the deploy fails.
+
 Deployment secrets:
 
 | Secret | Used for |

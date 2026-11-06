@@ -1,9 +1,10 @@
 import { getAuth } from 'firebase-admin/auth';
-import { Timestamp } from 'firebase-admin/firestore';
-import type { DocumentReference } from 'firebase-admin/firestore';
+import { FieldPath, Timestamp } from 'firebase-admin/firestore';
+import type { DocumentReference, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { db } from './admin';
 
 const MAX_WRITES_PER_BATCH = 400;
+const PAGE_SIZE = 500;
 
 interface AccountDeletionResult {
   deleted: boolean;
@@ -29,12 +30,46 @@ async function commitUpdates(
   }
 }
 
+async function fetchAll(
+  collection: string,
+  field: string,
+  uid: string,
+): Promise<QueryDocumentSnapshot[]> {
+  const results: QueryDocumentSnapshot[] = [];
+  let last: QueryDocumentSnapshot | undefined;
+
+  for (;;) {
+    let query = db
+      .collection(collection)
+      .where(field, '==', uid)
+      .orderBy(FieldPath.documentId())
+      .limit(PAGE_SIZE);
+    if (last) query = query.startAfter(last);
+    const snapshot = await query.get();
+    results.push(...snapshot.docs);
+    if (snapshot.size < PAGE_SIZE) break;
+    last = snapshot.docs[snapshot.size - 1];
+  }
+
+  return results;
+}
+
+function redactMessages(value: unknown, uid: string): unknown[] {
+  const messages = Array.isArray(value) ? value : [];
+  return messages.map((message) => {
+    if (!message || typeof message !== 'object') return message;
+    const senderId = (message as { senderId?: unknown }).senderId;
+    return senderId === uid ? { ...message, content: '[removed]' } : message;
+  });
+}
+
 /**
  * Deletes the caller's Auth account and profile, and anonymises content that
- * other users may still have in their trade history. Payment records are kept
- * (pseudonymously) for tax/fraud retention; see the privacy notice.
+ * other users may still have in their trade history. Message text written by
+ * the deleted user is redacted; the counterparty's side is preserved.
  *
- * Requires a recent sign-in: callers must have authenticated within 15 minutes.
+ * Payment records are kept (pseudonymously) for tax/fraud retention; see the
+ * privacy notice. Requires a recent sign-in (15 minutes).
  */
 export async function deleteAccount(
   uid: string,
@@ -46,23 +81,24 @@ export async function deleteAccount(
   }
 
   const [listings, bidsAsBidder, bidsAsOwner] = await Promise.all([
-    db.collection('barterItems').where('ownerId', '==', uid).limit(500).get(),
-    db.collection('activeBids').where('bidderId', '==', uid).limit(500).get(),
-    db.collection('activeBids').where('ownerId', '==', uid).limit(500).get(),
+    fetchAll('barterItems', 'ownerId', uid),
+    fetchAll('activeBids', 'bidderId', uid),
+    fetchAll('activeBids', 'ownerId', uid),
   ]);
 
   const bidUpdates = new Map<
     string,
     { ref: DocumentReference; data: Record<string, unknown> }
   >();
-  for (const doc of [...bidsAsBidder.docs, ...bidsAsOwner.docs]) {
+  for (const doc of [...bidsAsBidder, ...bidsAsOwner]) {
+    const data = doc.data();
     bidUpdates.set(doc.ref.path, {
       ref: doc.ref,
       data: {
         ownerName: 'Deleted user',
         bidderName: 'Deleted user',
-        offer: 'Offer removed',
-        messages: [],
+        ...(data.bidderId === uid ? { offer: 'Offer removed' } : {}),
+        messages: redactMessages(data.messages, uid),
         anonymised: true,
         updatedAt: Timestamp.now(),
       },
@@ -70,7 +106,7 @@ export async function deleteAccount(
   }
 
   await commitUpdates([
-    ...listings.docs.map((doc) => ({
+    ...listings.map((doc) => ({
       ref: doc.ref,
       data: {
         ownerName: 'Deleted user',

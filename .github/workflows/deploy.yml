@@ -111,12 +111,21 @@ jobs:
         if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
         run: npm --prefix functions ci --no-audit --no-fund
 
+      - name: Configure Cloud Functions runtime
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        env:
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          printf 'USE_SECRET_MANAGER=true\nCRYPTO_PROVIDER=nowpayments\n' > "functions/.env.$PROJECT_ID"
+
       - name: Deploy Cloud Functions
         if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
           PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
         run: |
+          export USE_SECRET_MANAGER=true
+          export CRYPTO_PROVIDER=nowpayments
           npx --yes firebase-tools@15 -c firebase.functions.json deploy \
             --only functions --project "$PROJECT_ID" --non-interactive
 

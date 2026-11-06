@@ -6,6 +6,7 @@ import type { PlanId } from './plans';
 import { getProvider, isSandbox, sandboxAllowed } from './provider';
 import { assertCheckoutRateLimit } from './rateLimit';
 import type { CheckoutSession, WebhookEvent } from './providers/types';
+import type { Firestore } from 'firebase-admin/firestore';
 
 export type PaymentErrorCode =
   | 'invalid-plan'
@@ -185,9 +186,9 @@ export async function createCheckout(ownerId: string, planId: unknown): Promise<
     });
   } catch (error) {
     // The invoice exists and the pending document is still present. A webhook
-    // can settle it; surface an error so the client can retry or contact support.
+    // can settle it by order_id; return the checkout URL rather than losing the
+    // invoice behind a client error.
     console.error('Could not attach provider details to payment:', error);
-    throw new PaymentError('unavailable', 'The payment was created but could not be displayed. Contact support.');
   }
 
   return toResponse(paymentId, completed);
@@ -249,22 +250,32 @@ export async function handleWebhook(event: WebhookEvent): Promise<void> {
  * Idempotent payment settlement. A payment can only move from pending to a
  * terminal state once, and only a paid event activates a plan.
  */
-async function settlePayment(paymentId: string, event: WebhookEvent): Promise<void> {
+export async function settlePayment(
+  paymentId: string,
+  event: WebhookEvent,
+  database: Firestore = db,
+): Promise<void> {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(paymentId)) {
     throw new Error('Invalid payment id');
   }
 
-  const paymentRef = db.collection('payments').doc(paymentId);
+  const paymentRef = database.collection('payments').doc(paymentId);
 
-  await db.runTransaction(async (transaction) => {
+  await database.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(paymentRef);
     if (!snapshot.exists) throw new Error('Payment not found');
 
     const data = snapshot.data() as Record<string, unknown>;
     if (data.status === 'paid') return;
-    if (data.status !== 'pending' && !(data.status === 'expired' && event.status === 'paid')) {
-      return;
-    }
+
+    // A verified paid event can recover an expired or amount-failed payment.
+    // Without this, a malformed/partial "finished" IPN would write the payment
+    // off forever even though the customer actually paid.
+    const recoverable =
+      data.status === 'pending' ||
+      (data.status === 'expired' && event.status === 'paid') ||
+      (data.status === 'failed' && event.status === 'paid');
+    if (!recoverable) return;
 
     const now = Timestamp.now();
     const expiresAt = data.expiresAt;
@@ -307,7 +318,7 @@ async function settlePayment(paymentId: string, event: WebhookEvent): Promise<vo
         throw new Error('Payment has no owner');
       }
 
-      const userRef = db.collection('users').doc(ownerId);
+      const userRef = database.collection('users').doc(ownerId);
       const userSnapshot = await transaction.get(userRef);
       const currentExpiry = userSnapshot.data()?.subscriptionExpiresAt;
       const extensionStart =

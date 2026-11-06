@@ -1,7 +1,8 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, Timestamp } from 'firebase-admin/firestore';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { db } from './admin';
 import { deleteAccount } from './account';
 import { getProvider } from './provider';
@@ -179,55 +180,67 @@ export const reconcileCryptoPayments = onSchedule(
       console.error('Crypto reconciliation has no provider:', error);
     }
 
-    const snapshot = await db
-      .collection('payments')
-      .where('status', 'in', ['pending', 'failed'])
-      .limit(100)
-      .get();
     const now = Date.now();
     const hour = 60 * 60 * 1000;
+    let cursor: QueryDocumentSnapshot | undefined;
 
-    for (const payment of snapshot.docs) {
-      const data = payment.data();
-      const createdAt = data.createdAt;
-      const providerPaymentId = data.providerPaymentId;
+    // Drain up to 500 records per run. The cursor makes progress even when
+    // some records remain pending because their provider lookup failed.
+    for (let page = 0; page < 5; page += 1) {
+      let query = db
+        .collection('payments')
+        .where('status', 'in', ['pending', 'failed'])
+        .orderBy(FieldPath.documentId())
+        .limit(100);
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.get();
+      if (snapshot.empty) break;
 
-      if (
-        provider?.fetchPaymentStatus &&
-        typeof providerPaymentId === 'string' &&
-        providerPaymentId.length > 0 &&
-        createdAt instanceof Timestamp &&
-        createdAt.toMillis() < now - hour
-      ) {
-        try {
-          const event = await provider.fetchPaymentStatus(providerPaymentId, payment.id);
-          if (event) {
-            await handleWebhook(event);
-            console.log('Reconciled payment', payment.id, event.providerStatus ?? event.status);
+      for (const payment of snapshot.docs) {
+        const data = payment.data();
+        const createdAt = data.createdAt;
+        const providerPaymentId = data.providerPaymentId;
+
+        if (
+          provider?.fetchPaymentStatus &&
+          typeof providerPaymentId === 'string' &&
+          providerPaymentId.length > 0 &&
+          createdAt instanceof Timestamp &&
+          createdAt.toMillis() < now - hour
+        ) {
+          try {
+            const event = await provider.fetchPaymentStatus(providerPaymentId, payment.id);
+            if (event) {
+              await handleWebhook(event);
+              console.log('Reconciled payment', payment.id, event.providerStatus ?? event.status);
+            }
+          } catch (error) {
+            console.error('Could not reconcile payment', payment.id, error);
           }
-        } catch (error) {
-          console.error('Could not reconcile payment', payment.id, error);
         }
+
+        await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(payment.ref);
+          if (!fresh.exists) return;
+          const freshData = fresh.data();
+          if (!freshData) return;
+          const expiresAt = freshData.expiresAt;
+          if (
+            freshData.status === 'pending' &&
+            expiresAt instanceof Timestamp &&
+            expiresAt.toMillis() < now - hour
+          ) {
+            transaction.update(payment.ref, {
+              status: 'expired',
+              providerStatus: freshData.providerStatus ?? 'expired',
+              updatedAt: Timestamp.now(),
+            });
+          }
+        });
       }
 
-      await db.runTransaction(async (transaction) => {
-        const fresh = await transaction.get(payment.ref);
-        if (!fresh.exists) return;
-        const freshData = fresh.data();
-        if (!freshData) return;
-        const expiresAt = freshData.expiresAt;
-        if (
-          freshData.status === 'pending' &&
-          expiresAt instanceof Timestamp &&
-          expiresAt.toMillis() < now - hour
-        ) {
-          transaction.update(payment.ref, {
-            status: 'expired',
-            providerStatus: freshData.providerStatus ?? 'expired',
-            updatedAt: Timestamp.now(),
-          });
-        }
-      });
+      cursor = snapshot.docs[snapshot.docs.length - 1];
+      if (snapshot.size < 100) break;
     }
   },
 );

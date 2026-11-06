@@ -144,17 +144,41 @@ These are deliberate gaps in a demo, not unnoticed bugs:
 - ESLint runs with TypeScript, React Hooks and security plugins; CI allows zero
   warnings.
 - `npm run security` runs the linter and a production-dependency audit
-  (`npm audit --omit=dev --audit-level=high`); `npm run security:all` also
-  includes dev-tool advisories. The application's production dependency tree
-  currently audits clean; the remaining advisories are in development tooling.
+  (`npm audit --omit=dev --audit-level=high`); CI fails on **high** or **critical**
+  runtime advisories in both the app and the Functions tree. `npm run security:all`
+  also includes dev-tool advisories, which are reported but do not block because
+  they never ship.
 - `.env*` files are ignored except `.env.example`; service-account JSON,
   `functions/.env*`, and `functions/lib` are ignored.
-- GitHub Actions uses npm with a committed lockfile and least-privilege
-  permissions; deployment secrets are referenced only through `secrets.*`.
+- `.env` and credential files are blocked twice: a gitleaks pre-commit hook and
+  the repository's push protection.
+- CI scans for secrets with gitleaks on every pull request (only the commits that
+  PR adds, so legacy history cannot red-build an unrelated change) and over the
+  full history every week. False positives are allowlisted narrowly in
+  `.gitleaks.toml` with a comment; the job is never disabled.
+- CodeQL runs `security-extended` queries on pull requests, `main` and weekly.
+- Dependency review blocks pull requests that introduce a high-severity advisory,
+  and Dependabot keeps npm and GitHub Actions dependencies current weekly.
+- GitHub Actions workflows use a committed lockfile (`npm ci`), least-privilege
+  `permissions`, and every action pinned to a full commit SHA. No workflow uses
+  `pull_request_target` or checks out and executes untrusted fork code.
+- Deployment is gated on a green CI run for the same commit, deploys
+  `firestore.rules` together with the app so rules cannot drift, and smoke tests
+  the live site and its security headers after upload.
+- Pull requests get an isolated Firebase Hosting preview channel, so review
+  happens against a real build without touching production.
+- A weekly job produces CycloneDX SBOMs for the app and Functions dependency
+  trees (90-day retention), so an advisory can be matched against what actually
+  shipped.
+- Branch protection (required checks, linear history, no force pushes, no
+  deletions) is applied from
+  [`scripts/ops/apply-branch-protection.mjs`](./scripts/ops/apply-branch-protection.mjs)
+  so the settings are reviewable; `CODEOWNERS` marks the rules, payment code and
+  pipelines for review.
 - `firestore.rules` uses deny-by-default and is covered by emulator tests,
   including payment access.
-- Secret scanning runs in CI with gitleaks against the repository history; a
-  matching pre-commit hook is available in `.pre-commit-config.yaml`.
+- Pipeline details are in [docs/devops.md](./docs/devops.md); incident, rollback
+  and credential-rotation procedures are in [docs/runbook.md](./docs/runbook.md).
 
 ## Hardening ideas for a real deployment
 

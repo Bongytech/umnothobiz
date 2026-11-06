@@ -268,10 +268,23 @@ Key invariants:
 
 ## CI and deployment
 
-`.github/workflows/ci.yml` runs lint, typecheck, unit tests, build, Functions
-tests/build and rules tests. `.github/workflows/deploy.yml` deploys Hosting +
-Firestore on `main` when `FIREBASE_SERVICE_ACCOUNT` is set. Cloud Functions are
-deployed only when the repository variable `CRYPTO_PROVIDER=nowpayments` is set.
+`ci.yml` runs lint, typecheck, unit tests, build, Functions tests/build, rules
+tests, a production dependency audit, a gitleaks secret scan and dependency
+review. `codeql.yml` adds static analysis, `security.yml` runs weekly full-history
+secret scanning, the dependency audit and SBOM generation, and `preview.yml`
+deploys a Firebase Hosting preview channel per pull request.
+
+`deploy.yml` is triggered by a **successful CI run** on `main` — not by the push
+itself — and deploys Firestore rules and indexes before Hosting, then smoke tests
+the live site. It deploys when `FIREBASE_SERVICE_ACCOUNT` is set and otherwise
+exits with a notice. Cloud Functions are deployed only when the repository
+variable `CRYPTO_PROVIDER=nowpayments` is set.
+
+Run the same checks locally with `npm run verify` (lint, typecheck, unit tests,
+build) and `npm run security` (lint plus production audit). The full pipeline
+map, secrets inventory and branch-protection procedure are in
+[docs/devops.md](./docs/devops.md); recovery steps are in
+[docs/runbook.md](./docs/runbook.md).
 
 **Free/Spark deployment:** `firebase deploy` uses `firebase.json`, which contains
 only Hosting + Firestore, so it works without a billing account. Crypto checkout

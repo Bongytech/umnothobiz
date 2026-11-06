@@ -306,14 +306,24 @@ See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
 - **Rules tests** start the Firestore emulator and exercise owner, participant,
   outsider, and payment access (`tests/rules/`).
 - **CI** runs lint, typecheck, unit tests, the production build, Cloud Functions
-  tests/build, and rules tests on every push and pull request.
-- **Deployment** runs on `main` when `FIREBASE_SERVICE_ACCOUNT` is configured;
-  otherwise the deploy step is skipped instead of failing the build. The default
+  tests/build, and rules tests on every push and pull request, plus a production
+  dependency audit, a gitleaks secret scan and dependency review.
+- **Security** is continuous: CodeQL static analysis and a weekly full-history
+  secret scan with SBOM generation run outside the per-push path.
+- **Deployment** runs only after CI passes on `main`, and only when
+  `FIREBASE_SERVICE_ACCOUNT` is configured; otherwise it exits with a notice
+  instead of failing the build. It deploys Firestore rules and indexes before
+  Hosting, and smoke tests the live site afterwards. The default
   `npm run deploy` / `firebase deploy` path deploys Hosting + Firestore and works
   on the free Spark plan. Cloud Functions require Blaze billing and deploy
   separately with `npm run deploy:functions`; the workflow does this only when
   the repository variable `CRYPTO_PROVIDER=nowpayments` is set and the
   NOWPayments credentials exist.
+- **Pull requests** get their own Firebase Hosting preview channel.
+
+Pipeline details, secrets inventory and branch protection live in
+[docs/devops.md](./docs/devops.md); incident and rollback procedures live in
+[docs/runbook.md](./docs/runbook.md).
 
 ---
 

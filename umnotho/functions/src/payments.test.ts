@@ -2,6 +2,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 import { settlePayment } from './payments';
+import { PLANS } from './plans';
 
 type Store = Map<string, Record<string, unknown>>;
 
@@ -71,6 +72,7 @@ describe('settlePayment', () => {
   it('settles a paid event that arrives after local expiry', async () => {
     const { db, store } = fakeDb({
       'payments/p1': payment({
+        status: 'expired',
         expiresAt: Timestamp.fromMillis(Date.now() - 60_000),
       }),
       'users/user1': {},
@@ -85,6 +87,7 @@ describe('settlePayment', () => {
     expect(store.get('payments/p1')).toMatchObject({
       status: 'paid',
       latePayment: true,
+      recoveredFrom: 'expired',
       amountReceived: 2.65,
     });
     expect(store.get('users/user1')?.subscriptionStatus).toBe('active');
@@ -128,6 +131,7 @@ describe('settlePayment', () => {
       db,
     );
     expect(store.get('payments/p1')?.status).toBe('paid');
+    expect(store.get('payments/p1')?.recoveredFrom).toBe('failed');
     expect(store.get('users/user1')?.subscriptionStatus).toBe('active');
   });
 
@@ -160,5 +164,53 @@ describe('settlePayment', () => {
       overpaid: true,
       amountReceived: 3,
     });
+  });
+
+  it('extends an existing subscription from its current expiry', async () => {
+    const existingExpiry = Timestamp.fromMillis(Date.now() + 10 * 24 * 60 * 60 * 1000);
+    const { db, store } = fakeDb({
+      'payments/p1': payment(),
+      'users/user1': { subscriptionExpiresAt: existingExpiry },
+    });
+
+    await settlePayment(
+      'p1',
+      { paymentId: 'p1', status: 'paid', amountUsdt: 2.65 },
+      db,
+    );
+
+    const newExpiry = store.get('users/user1')?.subscriptionExpiresAt as Timestamp;
+    expect(newExpiry.toMillis()).toBe(
+      existingExpiry.toMillis() + PLANS.basic.durationDays * 24 * 60 * 60 * 1000,
+    );
+  });
+
+  it('does not flag an amount inside the rounding tolerance as overpaid', async () => {
+    const { db, store } = fakeDb({
+      'payments/p1': payment(),
+      'users/user1': {},
+    });
+
+    await settlePayment(
+      'p1',
+      { paymentId: 'p1', status: 'paid', amountUsdt: 2.7 },
+      db,
+    );
+
+    expect(store.get('payments/p1')).toMatchObject({
+      status: 'paid',
+      overpaid: false,
+    });
+  });
+
+  it('does not turn a failed payment into expired on a later non-paid event', async () => {
+    const { db, store } = fakeDb({
+      'payments/p1': payment({ status: 'failed', amountReceived: 1 }),
+      'users/user1': {},
+    });
+
+    await settlePayment('p1', { paymentId: 'p1', status: 'pending' }, db);
+
+    expect(store.get('payments/p1')?.status).toBe('failed');
   });
 });

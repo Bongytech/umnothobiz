@@ -247,8 +247,9 @@ export async function handleWebhook(event: WebhookEvent): Promise<void> {
 }
 
 /**
- * Idempotent payment settlement. A payment can only move from pending to a
- * terminal state once, and only a paid event activates a plan.
+ * Idempotent payment settlement. A verified paid event may settle a pending,
+ * expired, or amount-failed payment, but once paid no later event changes the
+ * payment or extends the plan again.
  */
 export async function settlePayment(
   paymentId: string,
@@ -336,6 +337,9 @@ export async function settlePayment(
         amountReceived: event.amountUsdt,
         overpaid: event.amountUsdt > expectedUsdt + tolerance,
         latePayment: late,
+        ...(data.status === 'failed' || data.status === 'expired'
+          ? { recoveredFrom: data.status }
+          : {}),
         paidAt: now,
         updatedAt: now,
         txHash: event.txHash ?? null,

@@ -171,11 +171,14 @@ These are deliberate gaps in a demo, not unnoticed bugs:
 - A weekly job produces CycloneDX SBOMs for the app and Functions dependency
   trees (90-day retention), so an advisory can be matched against what actually
   shipped.
-- Branch protection (required checks, linear history, no force pushes, no
-  deletions) is applied from
-  [`scripts/ops/apply-branch-protection.mjs`](./scripts/ops/apply-branch-protection.mjs)
-  so the settings are reviewable; `CODEOWNERS` marks the rules, payment code and
-  pipelines for review.
+- Branch protection on `main` requires the CI checks that gate deployments, one
+  approving review, code-owner review, an up-to-date branch and resolved
+  conversations, with no force pushes or deletions, and applies to admins. Secret
+  scanning, push protection and Dependabot security updates are enabled. The
+  settings are re-appliable from
+  [`scripts/ops/apply-branch-protection.mjs`](./scripts/ops/apply-branch-protection.mjs),
+  which keeps any stricter rule it finds; `CODEOWNERS` marks the rules, payment
+  code and pipelines for review.
 - `firestore.rules` uses deny-by-default and is covered by emulator tests,
   including payment access.
 - Pipeline details are in [docs/devops.md](./docs/devops.md); incident, rollback

@@ -124,27 +124,36 @@ Branch protection cannot be stored in a file by GitHub itself, so it lives in a
 small script:
 
 ```bash
-GITHUB_TOKEN=<admin token> node scripts/ops/apply-branch-protection.mjs            # dry run
-GITHUB_TOKEN=<admin token> node scripts/ops/apply-branch-protection.mjs --apply    # write
-GITHUB_TOKEN=<admin token> node scripts/ops/apply-branch-protection.mjs --apply --require-pr
+GITHUB_TOKEN=<admin token> node scripts/ops/apply-branch-protection.mjs                # dry run
+GITHUB_TOKEN=<admin token> node scripts/ops/apply-branch-protection.mjs --apply        # write
+GITHUB_TOKEN=<admin token> node scripts/ops/apply-branch-protection.mjs --checks-only --apply
 ```
 
 It requires a token with **Administration: write** (fine-grained) or the `repo`
-scope (classic) — a token used for normal pushes will get a 403. The default
-configuration requires a green run of every check above, a branch that is up to
-date with `main`, linear history, conversation resolution, no force pushes and
-no deletions. `--require-pr` additionally requires a pull request; on a
-solo-maintained repository that means "always work on a branch" without needing
-a second reviewer. `--enforce-admins` applies the rules to you as well.
+scope (classic) — a token used for normal pushes will get a 403.
 
-The same run also attempts to enable secret scanning push protection, which is
-free for public repositories. If the token or plan cannot enable it, enable it
-under **Settings → Code security**.
+The script **never downgrades an existing rule**. It reads the current protection
+first and keeps the stricter value for approvals, code-owner review, admin
+enforcement and linear history, so re-running it cannot silently remove a
+requirement. `--require-pr` and `--enforce-admins` only ever turn a rule on;
+`--linear-history` is opt-in because it changes how pull requests merge.
 
-`CODEOWNERS` marks the rules, Functions and pipeline files for review. Code-owner
-review only becomes mandatory if branch protection asks for it; the script sets
-`require_code_owner_reviews: false` by default because the repository has a
-single maintainer.
+`--checks-only` is the surgical option: it updates the required status checks and
+nothing else. That is how this repository was adopted, because `main` already
+required a pull request, one approval and code-owner review with admins enforced.
+
+Current state of `main` (applied and verified with the checks-only path):
+
+- required checks: `Lint, typecheck, test, build`, `Firestore security rules`,
+  `Cloud Functions`, `Dependency vulnerability audit`, `Secret scan`,
+  `Analyze JavaScript/TypeScript`
+- up-to-date branch required, one approving review, code-owner review,
+  conversation resolution, no force pushes, no deletions, rules apply to admins
+- secret scanning and push protection enabled; Dependabot security updates
+  enabled
+
+`CODEOWNERS` marks the rules, Functions and pipeline files for review; because
+`main` requires code-owner review, those changes need the owner's approval.
 
 ## Secrets and variables inventory
 

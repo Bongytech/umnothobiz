@@ -1,0 +1,178 @@
+name: Deploy
+
+# Production deployment is gated on a green CI run for the same commit. The
+# workflow_run trigger means a failing test, audit or secret scan can never ship
+# to production, even if someone pushes straight to main.
+#
+# Required repository configuration (Settings -> Secrets and variables):
+#   secrets.FIREBASE_SERVICE_ACCOUNT  service-account JSON for the deploy identity
+#   secrets.VITE_FIREBASE_*           web app config baked into the bundle
+#   vars.CRYPTO_PROVIDER              set to `nowpayments` to deploy Functions
+# See docs/devops.md for the full inventory and docs/runbook.md for recovery.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: umnotho
+
+env:
+  SITE_URL: https://umnothobiz.web.app
+
+jobs:
+  deploy:
+    name: Deploy production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://umnothobiz.web.app
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: umnotho/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: npm run build
+
+      # Do not fail every push to main while Firebase credentials are not
+      # configured yet. Configure both secrets to enable deployments.
+      - name: Check deployment credentials
+        id: credentials
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ] || [ -z "$PROJECT_ID" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT or VITE_FIREBASE_PROJECT_ID is missing; skipping deployment."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write service account credentials
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/firebase-service-account.json"
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+
+      # Security rules must ship with the code that expects them. Deploying them
+      # here (not by hand) removes rule drift between the repository and the
+      # live Firebase project.
+      - name: Deploy Firestore rules and indexes
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          npx --yes firebase-tools@15 deploy \
+            --only firestore:rules,firestore:indexes \
+            --project "$PROJECT_ID" --non-interactive
+
+      - name: Install Cloud Functions dependencies
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        run: npm --prefix functions ci --no-audit --no-fund
+
+      - name: Configure Cloud Functions runtime
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        env:
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          printf 'USE_SECRET_MANAGER=true\nCRYPTO_PROVIDER=nowpayments\n' > "functions/.env.$PROJECT_ID"
+
+      - name: Deploy Cloud Functions
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          export USE_SECRET_MANAGER=true
+          export CRYPTO_PROVIDER=nowpayments
+          npx --yes firebase-tools@15 -c firebase.functions.json deploy \
+            --only functions --project "$PROJECT_ID" --non-interactive
+
+      - name: Deploy to Firebase Hosting
+        if: steps.credentials.outputs.ready == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          entryPoint: umnotho
+
+      # A deploy that returns zero can still leave a broken site behind. Confirm
+      # the live site answers and still sends its hardening headers.
+      - name: Smoke test production
+        if: steps.credentials.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          code="000"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$SITE_URL/" || true)
+            [ "$code" = "200" ] && break
+            echo "attempt $attempt: $SITE_URL returned $code; retrying"
+            sleep 6
+          done
+          if [ "$code" != "200" ]; then
+            echo "::error::$SITE_URL returned $code after deployment"
+            exit 1
+          fi
+
+          headers=$(curl -sSI "$SITE_URL/" | tr -d '\r')
+          for header in strict-transport-security x-content-type-options x-frame-options; do
+            if ! printf '%s' "$headers" | grep -qi "^$header:"; then
+              echo "::error::Missing $header header on $SITE_URL"
+              exit 1
+            fi
+          done
+          echo "Smoke test passed: $SITE_URL returned 200 with security headers."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deployment"
+            echo ""
+            echo "- Commit: \`${{ github.event.workflow_run.head_sha || github.sha }}\`"
+            echo "- Credentials configured: \`${{ steps.credentials.outputs.ready }}\`"
+            echo "- Site: $SITE_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,8 +1,8 @@
 # Security policy
 
-Umnotho is a portfolio project, not a hardened production marketplace. This
-document describes what the code actually enforces so contributors and users can
-reason about risk honestly.
+Umnotho is an agent-maintained public project, not a fully audited production
+marketplace. This document describes what the code actually enforces so
+contributors and users can reason about risk honestly.
 
 ## Reporting a vulnerability
 
@@ -36,7 +36,8 @@ The full source is [umnotho/firestore.rules](./umnotho/firestore.rules).
 
 - **Deny by default.** Only `users`, `barterItems` and `activeBids` are matched.
 - **Users**
-  - signed-in users may read profiles;
+  - only the owner can read a profile document (private contact data); public
+    display names are denormalised onto listings and bids;
   - a user may edit only their own `displayName`, `photoURL` and `updatedAt`;
   - another signed-in user may add **one** rating under their own UID, with a
     value from 1 to 5, and cannot overwrite it;
@@ -82,11 +83,16 @@ are in [docs/crypto-payments.md](./docs/crypto-payments.md).
   fallback is less isolated; prefer Secret Manager once the API is enabled.
 - A deployed function with no `CRYPTO_PROVIDER` refuses to create a checkout.
   The sandbox adapter only works when the Functions emulator is running.
-- `confirmSandboxPayment` is disabled unless `FUNCTIONS_EMULATOR=true` or
-  `ALLOW_SANDBOX_PAYMENTS=true`. The latter must never be set in production.
+- `confirmSandboxPayment` is disabled unless `FUNCTIONS_EMULATOR=true`, or
+  `ALLOW_SANDBOX_PAYMENTS=true` **and** the project is in
+  `SANDBOX_PROJECT_ALLOWLIST` (demo projects are allowed). A production project
+  cannot enable the sandbox with one environment variable.
+- NOWPayments in a deployed environment requires `USE_SECRET_MANAGER=true`; the
+  API key and IPN secret are bound from Secret Manager.
 - NOWPayments webhooks are verified with HMAC-SHA512 over the sorted raw JSON
   body (`x-nowpayments-sig`). The settlement transaction is idempotent, rejects
-  an amount more than 2% below the quote, and only `finished` counts as paid.
+  missing/underpaid amounts, accepts overpayments for follow-up, and only
+  `finished` counts as paid. Late paid events still activate the plan.
 - Checkout creation is rate-limited to five attempts per UID per 15 minutes.
 - App Check enforcement and verified-email requirements are opt-in
   (`ENFORCE_APP_CHECK=true`, `REQUIRE_VERIFIED_EMAIL=true`) and should be enabled
@@ -138,28 +144,49 @@ These are deliberate gaps in a demo, not unnoticed bugs:
 - ESLint runs with TypeScript, React Hooks and security plugins; CI allows zero
   warnings.
 - `npm run security` runs the linter and a production-dependency audit
-  (`npm audit --omit=dev --audit-level=high`); `npm run security:all` also
-  includes dev-tool advisories. The application's production dependency tree
-  currently audits clean; the remaining advisories are in development tooling.
+  (`npm audit --omit=dev --audit-level=high`); CI fails on **high** or **critical**
+  runtime advisories in both the app and the Functions tree. `npm run security:all`
+  also includes dev-tool advisories, which are reported but do not block because
+  they never ship.
 - `.env*` files are ignored except `.env.example`; service-account JSON,
   `functions/.env*`, and `functions/lib` are ignored.
-- GitHub Actions uses npm with a committed lockfile and least-privilege
-  permissions; deployment secrets are referenced only through `secrets.*`.
+- `.env` and credential files are blocked twice: a gitleaks pre-commit hook and
+  the repository's push protection.
+- CI scans for secrets with gitleaks on every pull request (only the commits that
+  PR adds, so legacy history cannot red-build an unrelated change) and over the
+  full history every week. False positives are allowlisted narrowly in
+  `.gitleaks.toml` with a comment; the job is never disabled.
+- CodeQL runs `security-extended` queries on pull requests, `main` and weekly.
+- Dependency review is wired into CI but is advisory while the repository's
+  dependency graph is disabled; the production-dependency audit is the hard gate.
+  Dependabot keeps npm and GitHub Actions dependencies current weekly.
+- GitHub Actions workflows use a committed lockfile (`npm ci`), least-privilege
+  `permissions`, and every action pinned to a full commit SHA. No workflow uses
+  `pull_request_target` or checks out and executes untrusted fork code.
+- Deployment is gated on a green CI run for the same commit, deploys
+  `firestore.rules` together with the app so rules cannot drift, and smoke tests
+  the live site and its security headers after upload.
+- Pull requests get an isolated Firebase Hosting preview channel, so review
+  happens against a real build without touching production.
+- A weekly job produces CycloneDX SBOMs for the app and Functions dependency
+  trees (90-day retention), so an advisory can be matched against what actually
+  shipped.
+- Branch protection (required checks, linear history, no force pushes, no
+  deletions) is applied from
+  [`scripts/ops/apply-branch-protection.mjs`](./scripts/ops/apply-branch-protection.mjs)
+  so the settings are reviewable; `CODEOWNERS` marks the rules, payment code and
+  pipelines for review.
 - `firestore.rules` uses deny-by-default and is covered by emulator tests,
   including payment access.
-- Secret scanning can be enabled with GitHub's own secret scanning or a gitleaks
-  pre-commit hook; the old ad-hoc workflow files were removed because they
-  referenced a non-existent `functions/` directory.
+- Pipeline details are in [docs/devops.md](./docs/devops.md); incident, rollback
+  and credential-rotation procedures are in [docs/runbook.md](./docs/runbook.md).
 
 ## Hardening ideas for a real deployment
 
-1. Add a real provider adapter with signed webhooks, amount/asset/network
-   validation, and reconciliation.
-2. Add App Check to reduce scripted abuse.
-3. Add per-UID rate limiting on checkout creation and webhook processing.
-4. Add email verification and, for business accounts, KYB checks.
-5. Add refunds, receipts, tax/VAT reporting, and a payment support process.
-6. Add automated backup/export and an incident-response runbook.
-7. Add dependency and container scanning (Dependabot is already configured).
+1. Add server-enforced quotas for listings, questions, bids, and messages.
+2. Validate ratings in a trusted backend instead of a client-written map.
+3. Add moderation/admin tooling and an abuse report queue.
+4. Add KYB checks for business accounts, refunds, receipts, and tax/VAT reporting.
+5. Add automated backup/export and an incident-response runbook.
 
-Last reviewed: 2026-11-04.
+Last reviewed: 2026-11-06.

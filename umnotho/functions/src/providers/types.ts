@@ -40,4 +40,6 @@ export interface PaymentProvider {
   quote(amountZar: number): Promise<Quote>;
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>;
   parseWebhook(rawBody: Buffer | string, signature: string): WebhookEvent;
+  /** Optional reconciliation lookup used by the scheduled sweep. */
+  fetchPaymentStatus?(providerPaymentId: string, paymentId: string): Promise<WebhookEvent | null>;
 }

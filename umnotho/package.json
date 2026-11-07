@@ -23,6 +23,7 @@
     "functions:build": "npm --prefix functions run build",
     "functions:test": "npm --prefix functions test",
     "emulators": "npm --prefix functions run build && npx --yes firebase-tools@15 -c firebase.emulators.json emulators:start --only auth,firestore,functions --project demo-umnotho",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build",
     "security": "npm run lint && npm audit --omit=dev --audit-level=high",
     "security:all": "npm run lint && npm audit --audit-level=high",
     "security:report": "node scripts/security-monitor.js",

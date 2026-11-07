@@ -114,15 +114,31 @@ export default function Pricing() {
     if (!pendingPaymentId) return;
 
     let cancelled = false;
-    const interval = window.setInterval(() => {
+    let attempts = 0;
+    let interval = 0;
+
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return;
+      attempts += 1;
+      if (attempts > 60) {
+        window.clearInterval(interval);
+        return;
+      }
+
       void readCheckout(pendingPaymentId)
         .then((next) => {
-          if (!cancelled) setCheckout(next);
+          if (cancelled) return;
+          setCheckout(next);
+          if (next.status !== 'pending' || checkoutIsExpired(next.expiresAt)) {
+            window.clearInterval(interval);
+          }
         })
         .catch((error: unknown) => {
           console.error('Could not refresh crypto payment:', error);
         });
-    }, 5_000);
+    };
+
+    interval = window.setInterval(tick, 5_000);
 
     return () => {
       cancelled = true;

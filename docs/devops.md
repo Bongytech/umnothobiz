@@ -53,7 +53,7 @@ CI jobs and the check names they publish:
 | functions | `Cloud Functions` |
 | audit | `Dependency vulnerability audit` |
 | secrets | `Secret scan` |
-| dependency-review | `Dependency review` |
+| dependency-review | `Dependency review (advisory)` — reported, not required |
 | (CodeQL) | `Analyze JavaScript/TypeScript` |
 
 If you rename a job, update `CHECK_NAMES` in
@@ -103,7 +103,7 @@ prefer pushing a commit.
 | Secret scanning (local) | `.pre-commit-config.yaml` | `pre-commit install` then gitleaks runs on staged changes |
 | Push protection | GitHub repository settings | Blocks a credential before it reaches the remote |
 | SAST | `codeql.yml` | `security-extended` queries for JavaScript/TypeScript |
-| Dependency review | `ci.yml` → `dependency-review` | Fails a PR that introduces a high-severity advisory |
+| Dependency review | `ci.yml` → `dependency-review` | Advisory only: the dependency graph is disabled on this repository, so the action cannot run. Enable **Settings → Code security → Dependency graph** and drop `continue-on-error` to make it blocking |
 | Vulnerability audit | `ci.yml` → `audit`, `security.yml` → `audit` | `npm audit --omit=dev --audit-level=high` for app and Functions |
 | SBOM | `security.yml` → `sbom` | CycloneDX, kept 90 days as an artifact |
 | Dependency updates | `.github/dependabot.yml` | Weekly npm (app + Functions) and GitHub Actions updates, grouped |
@@ -220,6 +220,6 @@ if you need it.
 | Deploy did not run after a merge | CI failed, or CI did not run on that commit | Actions → CI for the commit; re-run, or use `workflow_dispatch` |
 | Deploy green but site unchanged | Credentials missing (see the notice) | Set `FIREBASE_SERVICE_ACCOUNT` and `VITE_FIREBASE_PROJECT_ID` |
 | `Secret scan` fails on a legitimate value | Pattern matches a fixture or sample | Prefer a targeted `[allowlist]` entry in `.gitleaks.toml` with a comment explaining why; never disable the job |
-| `Dependency review` fails | New high advisory in the dependency graph | Update the dependency or document the exception |
+| `Dependency review (advisory)` fails | Expected while the dependency graph is disabled; the advisory means it could not run | Treat as a reminder to enable the graph, not as a blocked merge |
 | `Firestore security rules` times out | Emulator startup or port conflict | Re-run; the suite is single-port and occasionally slow on cold runners |
 | `npm ci` fails on EUSAGE | Lockfile out of sync with `package.json` | Run `npm install` locally and commit the lockfile |

@@ -21,6 +21,11 @@ jobs:
   history:
     name: Full-history secret scan
     runs-on: ubuntu-latest
+    # The gitleaks container mounts $PWD and reads .gitleaks.toml from the
+    # repository root, so this job must run from the root, not umnotho/.
+    defaults:
+      run:
+        working-directory: .
     steps:
       - name: Checkout full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

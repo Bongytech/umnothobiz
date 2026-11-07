@@ -22,7 +22,6 @@ const CHECK_NAMES = [
   'Cloud Functions',
   'Dependency vulnerability audit',
   'Secret scan',
-  'Dependency review',
   'Analyze JavaScript/TypeScript',
 ];
 

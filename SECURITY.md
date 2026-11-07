@@ -157,8 +157,9 @@ These are deliberate gaps in a demo, not unnoticed bugs:
   full history every week. False positives are allowlisted narrowly in
   `.gitleaks.toml` with a comment; the job is never disabled.
 - CodeQL runs `security-extended` queries on pull requests, `main` and weekly.
-- Dependency review blocks pull requests that introduce a high-severity advisory,
-  and Dependabot keeps npm and GitHub Actions dependencies current weekly.
+- Dependency review is wired into CI but is advisory while the repository's
+  dependency graph is disabled; the production-dependency audit is the hard gate.
+  Dependabot keeps npm and GitHub Actions dependencies current weekly.
 - GitHub Actions workflows use a committed lockfile (`npm ci`), least-privilege
   `permissions`, and every action pinned to a full commit SHA. No workflow uses
   `pull_request_target` or checks out and executes untrusted fork code.

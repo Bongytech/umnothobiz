@@ -163,7 +163,12 @@ jobs:
             --no-banner --redact --verbose "${scan_args[@]}"
 
   dependency-review:
-    name: Dependency review
+    # Advisory, not a gate: the dependency graph is disabled on this repository,
+    # so the action fails before it can evaluate anything. The audit job above is
+    # the hard gate for high-severity runtime advisories. Enable Settings -> Code
+    # security -> Dependency graph, then remove continue-on-error (and this
+    # rename) to make dependency review blocking.
+    name: Dependency review (advisory)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:

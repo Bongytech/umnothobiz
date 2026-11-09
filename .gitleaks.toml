@@ -1,0 +1,45 @@
+# Secret scanning for the Umnotho repository.
+#
+# The upstream gitleaks ruleset is included with `useDefault = true` because it
+# is actively maintained and tuned to avoid noise. The rules below only add
+# coverage for credentials this project can actually hold. Do not replace the
+# default ruleset with a hand-written one: broad regexes such as "any quoted
+# 32-character string" flag ordinary identifiers and train people to ignore
+# alerts.
+
+title = "Umnotho secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "firebase-service-account"
+description = "Google service account JSON (Firebase deploy credential)"
+regex = '''"type"\s*:\s*"service_account"'''
+keywords = ["service_account"]
+tags = ["google", "firebase", "credential"]
+
+[[rules]]
+id = "nowpayments-api-key"
+description = "NOWPayments API key"
+regex = '''(?i)nowpayments_api_key\s*[=:]\s*["']?[A-Z0-9]{8,}-[A-Z0-9-]{8,}["']?'''
+keywords = ["nowpayments_api_key"]
+tags = ["nowpayments", "payments", "credential"]
+
+[[rules]]
+id = "nowpayments-ipn-secret"
+description = "NOWPayments IPN signing secret"
+regex = '''(?i)nowpayments_ipn_secret\s*[=:]\s*["']?[A-Za-z0-9+/=]{16,}["']?'''
+keywords = ["nowpayments_ipn_secret"]
+tags = ["nowpayments", "payments", "credential"]
+
+[allowlist]
+description = "Third-party skill documentation and dependency lockfile hashes"
+paths = [
+  # Vendored agent-skill references, not project code. These are documentation
+  # snippets that contain sample passwords and package checksums.
+  '''^umnotho/\.agents/skills/''',
+  # Lockfiles store base64 integrity hashes, not credentials.
+  '''^umnotho/package-lock\.json$''',
+  '''^umnotho/functions/package-lock\.json$''',
+]

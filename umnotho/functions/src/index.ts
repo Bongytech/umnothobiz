@@ -1,6 +1,12 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { FieldPath, Timestamp } from 'firebase-admin/firestore';
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { db } from './admin';
+import { deleteAccount } from './account';
 import { getProvider } from './provider';
+import type { PaymentProvider, WebhookEvent } from './providers/types';
 import { cryptoSecrets } from './secrets';
 import {
   PaymentError,
@@ -77,6 +83,29 @@ export const getCryptoCheckout = onCall(callableOptions, async (request) => {
   }
 });
 
+/**
+ * Account deletion. Requires a recent sign-in so a stolen session cannot erase
+ * the account silently. Auth is deleted last; trade records are anonymised.
+ */
+export const deleteMyAccount = onCall(callableOptions, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in before deleting your account.');
+  }
+
+  try {
+    return await deleteAccount(request.auth.uid, request.auth.token.auth_time);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'reauth-required') {
+      throw new HttpsError(
+        'failed-precondition',
+        'Sign in again in the last 15 minutes before deleting your account.',
+      );
+    }
+    console.error('Account deletion failed:', error);
+    throw new HttpsError('internal', 'Could not delete the account. Contact support.');
+  }
+});
+
 export const confirmSandboxPayment = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in to confirm this payment.');
@@ -100,19 +129,118 @@ export const cryptoWebhook = onRequest(withSecrets, async (request, response) =>
     return;
   }
 
+  let provider: PaymentProvider;
   try {
-    const provider = getProvider();
-    const rawBody =
-      (request as typeof request & { rawBody?: Buffer }).rawBody ??
-      Buffer.from(JSON.stringify(request.body ?? {}));
-    const signature =
-      request.header('x-nowpayments-sig') ?? request.header('x-crypto-signature') ?? '';
-    const event = provider.parseWebhook(rawBody, signature);
+    provider = getProvider();
+  } catch (error) {
+    console.error('Crypto webhook provider is unavailable:', error);
+    response.status(503).json({ ok: false, error: 'Payment provider unavailable' });
+    return;
+  }
 
-    await handleWebhook(event);
-    response.status(200).json({ ok: true });
+  const rawBody =
+    (request as typeof request & { rawBody?: Buffer }).rawBody ??
+    Buffer.from(JSON.stringify(request.body ?? {}));
+  const signature =
+    request.header('x-nowpayments-sig') ?? request.header('x-crypto-signature') ?? '';
+
+  let event: WebhookEvent;
+  try {
+    event = provider.parseWebhook(rawBody, signature);
   } catch (error) {
     console.error('Crypto webhook rejected:', error);
     response.status(400).json({ ok: false, error: 'Invalid webhook' });
+    return;
+  }
+
+  try {
+    await handleWebhook(event);
+    response.status(200).json({ ok: true });
+  } catch (error) {
+    // A transient Firestore/provider failure must be retried by the provider.
+    console.error('Crypto settlement failed:', error);
+    response.status(500).json({ ok: false, error: 'Settlement failed' });
   }
 });
+
+/**
+ * Hourly safety net for missed webhooks and abandoned checkouts.
+ *
+ * - Reconciles pending payments older than an hour against the provider.
+ * - Marks checkouts expired only after a grace period, in a transaction that
+ *   re-checks the current status so a paid webhook is never overwritten.
+ */
+export const reconcileCryptoPayments = onSchedule(
+  { schedule: 'every 60 minutes', secrets: cryptoSecrets },
+  async () => {
+    let provider: PaymentProvider | null = null;
+    try {
+      provider = getProvider();
+    } catch (error) {
+      console.error('Crypto reconciliation has no provider:', error);
+    }
+
+    const now = Date.now();
+    const hour = 60 * 60 * 1000;
+    let cursor: QueryDocumentSnapshot | undefined;
+
+    // Drain up to 500 records per run. The cursor makes progress even when
+    // some records remain pending because their provider lookup failed.
+    for (let page = 0; page < 5; page += 1) {
+      let query = db
+        .collection('payments')
+        .where('status', 'in', ['pending', 'failed'])
+        .orderBy(FieldPath.documentId())
+        .limit(100);
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.get();
+      if (snapshot.empty) break;
+
+      for (const payment of snapshot.docs) {
+        const data = payment.data();
+        const createdAt = data.createdAt;
+        const providerPaymentId = data.providerPaymentId;
+
+        if (
+          provider?.fetchPaymentStatus &&
+          typeof providerPaymentId === 'string' &&
+          providerPaymentId.length > 0 &&
+          createdAt instanceof Timestamp &&
+          createdAt.toMillis() < now - hour
+        ) {
+          try {
+            const event = await provider.fetchPaymentStatus(providerPaymentId, payment.id);
+            if (event) {
+              await handleWebhook(event);
+              console.log('Reconciled payment', payment.id, event.providerStatus ?? event.status);
+            }
+          } catch (error) {
+            console.error('Could not reconcile payment', payment.id, error);
+          }
+        }
+
+        await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(payment.ref);
+          if (!fresh.exists) return;
+          const freshData = fresh.data();
+          if (!freshData) return;
+          const expiresAt = freshData.expiresAt;
+          if (
+            freshData.status === 'pending' &&
+            expiresAt instanceof Timestamp &&
+            expiresAt.toMillis() < now - hour
+          ) {
+            transaction.update(payment.ref, {
+              status: 'expired',
+              providerStatus: freshData.providerStatus ?? 'expired',
+              updatedAt: Timestamp.now(),
+            });
+          }
+        });
+      }
+
+      cursor = snapshot.docs[snapshot.docs.length - 1];
+      if (snapshot.size < 100) break;
+    }
+  },
+);

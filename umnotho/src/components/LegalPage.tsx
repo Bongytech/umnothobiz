@@ -103,7 +103,8 @@ const CONTENT: Record<LegalKind, { title: string; updated: string; sections: Sec
       {
         heading: 'Your choices and rights',
         paragraphs: [
-          'You can update your display name, delete listings you own, and ask for access, correction, or deletion of your personal information by emailing bongy.tech@gmail.com.',
+          'You can update your display name, delete listings you own, or delete your account from the Profile page. Deleting your account removes your profile and sign-in record, and anonymises your listings and trade messages.',
+          'Payment records are retained in pseudonymised form for tax, fraud-prevention, and accounting obligations. For access or correction requests, email bongy.tech@gmail.com.',
           'You may also complain to the South African Information Regulator. We will respond to requests within a reasonable period.',
         ],
       },

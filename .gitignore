@@ -1,0 +1,18 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+**/.env.local
+**/.secret.local
+**/service-account*.json
+**/*service-account*.json
+**/*credentials*.json
+
+# Generated and local artifacts
+security-reports/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+# Reviewers for the parts of this repository where a mistake is expensive.
+# Branch protection can require code-owner review; see docs/devops.md.
+* @Bongytech
+
+# Security rules and payment code gate access to money and personal data.
+/umnotho/firestore.rules @Bongytech
+/umnotho/functions/ @Bongytech
+
+# Pipelines and repository automation.
+/.github/ @Bongytech
+/.gitleaks.toml @Bongytech
+/.pre-commit-config.yaml @Bongytech

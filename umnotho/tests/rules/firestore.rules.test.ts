@@ -14,6 +14,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -109,12 +110,16 @@ afterAll(async () => {
 });
 
 describe('users', () => {
-  it('lets a signed-in user read profiles but blocks signed-out reads', async () => {
+  it('lets owners read their own profile only, and blocks user enumeration', async () => {
     const buyerDb = testEnv.authenticatedContext('buyer').firestore();
+    const ownerDb = testEnv.authenticatedContext('owner').firestore();
     const anonDb = testEnv.unauthenticatedContext().firestore();
 
-    await assertSucceeds(getDoc(doc(buyerDb, 'users', 'owner')));
+    await assertSucceeds(getDoc(doc(buyerDb, 'users', 'buyer')));
+    await assertSucceeds(getDoc(doc(ownerDb, 'users', 'owner')));
+    await assertFails(getDoc(doc(buyerDb, 'users', 'owner')));
     await assertFails(getDoc(doc(anonDb, 'users', 'owner')));
+    await assertFails(getDocs(collection(buyerDb, 'users')));
   });
 
   it('creates a profile only for the signed-in user and with safe fields', async () => {
@@ -255,13 +260,57 @@ describe('activeBids', () => {
     );
   });
 
-  it('lets the bidder withdraw the offer', async () => {
+  it('lets the bidder decline an open offer without deleting its history', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'activeBids', 'bid1'), newBid());
+      await setDoc(doc(context.firestore(), 'activeBids', 'bid2'), {
+        ...newBid(),
+        status: 'In Negotiation',
+      });
+    });
+
+    const buyerDb = testEnv.authenticatedContext('buyer').firestore();
+    await assertSucceeds(
+      updateDoc(doc(buyerDb, 'activeBids', 'bid1'), {
+        status: 'Declined',
+        lastUpdated: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(buyerDb, 'activeBids', 'bid2'), {
+        status: 'Declined',
+        lastUpdated: new Date(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(buyerDb, 'activeBids', 'bid2'), {
+        status: 'Completed',
+        lastUpdated: new Date(),
+      }),
+    );
+  });
+
+  it('lets the bidder withdraw a pending offer only', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'activeBids', 'bid1'), newBid());
     });
 
     const buyerDb = testEnv.authenticatedContext('buyer').firestore();
     await assertSucceeds(deleteDoc(doc(buyerDb, 'activeBids', 'bid1')));
+  });
+
+  it('does not let either participant delete closed trade history', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'activeBids', 'bid1'), {
+        ...newBid(),
+        status: 'Completed',
+      });
+    });
+
+    const buyerDb = testEnv.authenticatedContext('buyer').firestore();
+    const ownerDb = testEnv.authenticatedContext('owner').firestore();
+    await assertFails(deleteDoc(doc(buyerDb, 'activeBids', 'bid1')));
+    await assertFails(deleteDoc(doc(ownerDb, 'activeBids', 'bid1')));
   });
 });
 

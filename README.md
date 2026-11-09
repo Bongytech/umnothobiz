@@ -320,6 +320,10 @@ See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
   the repository variable `CRYPTO_PROVIDER=nowpayments` is set and the
   NOWPayments credentials exist.
 - **Pull requests** get their own Firebase Hosting preview channel.
+- **Environments**: staging deploys automatically from `main`, UAT deploys when a
+  `v*` release tag is pushed, and production follows once UAT has signed off.
+  Each is a separate Firebase project with its own URL and env-scoped secrets —
+  one repository, three deploys.
 
 Pipeline details, secrets inventory and branch protection live in
 [docs/devops.md](./docs/devops.md); incident and rollback procedures live in

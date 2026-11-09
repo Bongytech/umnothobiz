@@ -1,0 +1,189 @@
+name: Deploy UAT
+
+# UAT is the sign-off environment. It deploys when a release tag is pushed, so
+# tagging is the deliberate human action that promotes a build. It can also be
+# run manually for a specific tag or commit.
+#
+# Configuration lives on the GitHub Environment named `uat`
+# (Settings -> Environments): FIREBASE_SERVICE_ACCOUNT, VITE_FIREBASE_* and an
+# optional `CRYPTO_PROVIDER` variable for the UAT Firebase project.
+# See docs/devops.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag or commit SHA to deploy to UAT
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  deployments: write
+
+concurrency:
+  group: deploy-uat
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: umnotho
+
+env:
+  SITE_URL: https://umnotho-uat.web.app
+  FIREBASE_CONFIG: firebase.uat.json
+  PRODUCTION_PROJECT_ID: umnotho-f71ba
+
+jobs:
+  deploy:
+    name: Deploy UAT
+    runs-on: ubuntu-latest
+    environment:
+      name: uat
+      url: https://umnotho-uat.web.app
+    steps:
+      - name: Checkout the requested release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      # A tag on a random feature branch is not a release. Only commits that are
+      # already on main (and therefore passed CI and review) may go to UAT.
+      - name: Verify the commit is on main
+        run: |
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$(git rev-parse --short HEAD) is not on main. Tag or choose a commit from main."
+            exit 1
+          fi
+          echo "Verified $(git rev-parse --short HEAD) is on main."
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: umnotho/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: npm run build
+
+      - name: Check deployment credentials
+        id: credentials
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          PRODUCTION_PROJECT_ID: ${{ env.PRODUCTION_PROJECT_ID }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ] || [ -z "$PROJECT_ID" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The uat environment has no FIREBASE_SERVICE_ACCOUNT or VITE_FIREBASE_PROJECT_ID; skipping."
+          elif [ "$PROJECT_ID" = "$PRODUCTION_PROJECT_ID" ]; then
+            echo "::error::Refusing to deploy UAT to the production project ($PROJECT_ID)."
+            exit 1
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write service account credentials
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/firebase-service-account.json"
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+
+      - name: Deploy Firestore rules and indexes
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          npx --yes firebase-tools@15 -c "$FIREBASE_CONFIG" deploy \
+            --only firestore:rules,firestore:indexes \
+            --project "$PROJECT_ID" --non-interactive
+
+      - name: Install Cloud Functions dependencies
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        run: npm --prefix functions ci --no-audit --no-fund
+
+      - name: Configure Cloud Functions runtime
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        env:
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          printf 'USE_SECRET_MANAGER=true\nCRYPTO_PROVIDER=nowpayments\n' > "functions/.env.$PROJECT_ID"
+
+      - name: Deploy Cloud Functions
+        if: steps.credentials.outputs.ready == 'true' && vars.CRYPTO_PROVIDER == 'nowpayments'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          export USE_SECRET_MANAGER=true
+          export CRYPTO_PROVIDER=nowpayments
+          npx --yes firebase-tools@15 -c firebase.functions.json deploy \
+            --only functions --project "$PROJECT_ID" --non-interactive
+
+      - name: Deploy to Firebase Hosting
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          npx --yes firebase-tools@15 -c "$FIREBASE_CONFIG" deploy \
+            --only hosting --project "$PROJECT_ID" --non-interactive
+
+      - name: Smoke test UAT
+        if: steps.credentials.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          code="000"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$SITE_URL/" || true)
+            [ "$code" = "200" ] && break
+            echo "attempt $attempt: $SITE_URL returned $code; retrying"
+            sleep 6
+          done
+          if [ "$code" != "200" ]; then
+            echo "::error::$SITE_URL returned $code after deployment"
+            exit 1
+          fi
+
+          headers=$(curl -sSI "$SITE_URL/" | tr -d '\r')
+          for header in strict-transport-security x-content-type-options x-frame-options; do
+            if ! printf '%s' "$headers" | grep -qi "^$header:"; then
+              echo "::error::Missing $header header on $SITE_URL"
+              exit 1
+            fi
+          done
+          if ! printf '%s' "$headers" | grep -qi '^x-robots-tag:.*noindex'; then
+            echo "::error::$SITE_URL is missing X-Robots-Tag: noindex"
+            exit 1
+          fi
+          echo "Smoke test passed: $SITE_URL returned 200, security headers and noindex present."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### UAT deployment"
+            echo ""
+            echo "- Ref: \`${{ github.event.inputs.ref || github.ref }}\`"
+            echo "- Commit: \`$(git rev-parse --short HEAD)\`"
+            echo "- Credentials configured: \`${{ steps.credentials.outputs.ready }}\`"
+            echo "- Site: $SITE_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

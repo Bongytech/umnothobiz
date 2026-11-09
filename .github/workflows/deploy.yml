@@ -8,6 +8,8 @@ name: Deploy
 #   secrets.FIREBASE_SERVICE_ACCOUNT  service-account JSON for the deploy identity
 #   secrets.VITE_FIREBASE_*           web app config baked into the bundle
 #   vars.CRYPTO_PROVIDER              set to `nowpayments` to deploy Functions
+#   vars.REQUIRE_UAT_SIGNOFF          set to `true` to require a successful UAT
+#                                     deployment of the same commit first
 # See docs/devops.md for the full inventory and docs/runbook.md for recovery.
 
 on:
@@ -22,6 +24,7 @@ permissions:
   checks: write
   pull-requests: write
   actions: read
+  deployments: read
 
 concurrency:
   group: deploy-production
@@ -76,15 +79,37 @@ jobs:
       - name: Check deployment credentials
         id: credentials
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          REQUIRE_UAT_SIGNOFF: ${{ vars.REQUIRE_UAT_SIGNOFF }}
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           if [ -z "$SERVICE_ACCOUNT" ] || [ -z "$PROJECT_ID" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::FIREBASE_SERVICE_ACCOUNT or VITE_FIREBASE_PROJECT_ID is missing; skipping deployment."
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          # Optional release gate: with REQUIRE_UAT_SIGNOFF=true, production only
+          # ships a commit that was successfully deployed to UAT. A manual run
+          # bypasses the gate, which is the documented hotfix path.
+          if [ "$REQUIRE_UAT_SIGNOFF" = "true" ] && [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+            signed_off=false
+            for id in $(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=uat&per_page=50" \
+              --jq ".[] | select(.sha == \"$TARGET_SHA\") | .id"); do
+              state=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --jq '.[0].state')
+              if [ "$state" = "success" ]; then signed_off=true; fi
+            done
+            if [ "$signed_off" != "true" ]; then
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::$TARGET_SHA has no successful UAT deployment; production stays on the current release. Tag a release (Deploy UAT), then re-run this workflow."
+              exit 0
+            fi
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Write service account credentials
         if: steps.credentials.outputs.ready == 'true'

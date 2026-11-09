@@ -33,7 +33,7 @@ regex = '''(?i)nowpayments_ipn_secret\s*[=:]\s*["']?[A-Za-z0-9+/=]{16,}["']?'''
 keywords = ["nowpayments_ipn_secret"]
 tags = ["nowpayments", "payments", "credential"]
 
-[allowlist]
+[[allowlists]]
 description = "Third-party skill documentation and dependency lockfile hashes"
 paths = [
   # Vendored agent-skill references, not project code. These are documentation
@@ -43,3 +43,32 @@ paths = [
   '''^umnotho/package-lock\.json$''',
   '''^umnotho/functions/package-lock\.json$''',
 ]
+
+# Reviewed historical findings. These cannot be fixed by editing the working
+# tree — they live in commits that are already public. Each allowlist is scoped
+# to both the exact commits and the exact path, so a new leak in the same file
+# (a different commit) is still reported.
+#
+# 1. umnotho/.env contained VITE_FIREBASE_API_KEY. A Firebase web API key is a
+#    public project identifier, not an authorization secret (see SECURITY.md),
+#    but it should still be rotated and restricted by HTTP referrer when found.
+#    The file has since been removed and .env is gitignored.
+# 2. umnotho/.github/workflows/secrets-audit.yml was a grep template containing
+#    the string "type": "service_account" as a pattern. It matched the
+#    service-account rule; it is not a credential.
+[[allowlists]]
+description = "Historical .env commits (public Firebase web API key)"
+condition = "AND"
+commits = [
+  "b8d2e6dbfd6c27462e6e77a62f3d448a24d9cf87",
+  "70ce1d3bf86b94c026064953e4e55980d83186cf",
+  "5f8b91e573c2b2bd536fe180074a75ed4db531bc",
+  "e2a5a1661e95e49d41e3e33a9f3eed42ba18f31c",
+]
+paths = ['''^umnotho/\.env$''']
+
+[[allowlists]]
+description = "Legacy workflow grep template that quotes the service_account JSON shape"
+condition = "AND"
+commits = ["b9fc3314a0d64af6dfaf87279cfb335c7576c332"]
+paths = ['''^umnotho/\.github/workflows/secrets-audit\.yml$''']

@@ -8,8 +8,9 @@
 
 Umnotho is a peer-to-peer barter marketplace. People list goods or services, make
 trade offers, negotiate in a private thread, and rate each other after a trade.
-It is a portfolio project built with React, TypeScript, Vite, Tailwind CSS and
-Firebase.
+It is a public, full-stack **agentic engineering** project: the codebase is
+maintained by AI coding agents, with the human maintainer retaining product,
+security, and release authority.
 
 **Live demo:** [umnothobiz.web.app](https://umnothobiz.web.app/)
 
@@ -17,25 +18,56 @@ Firebase.
 
 ---
 
+## How this project is built
+
+This repository is intentionally public because it demonstrates an end-to-end
+agentic development workflow, not just an AI-generated prototype.
+
+- **Agents maintain the project.** Planning, implementation, tests, refactors,
+  dependency work, documentation, security fixes, and pull requests are performed
+  by AI coding agents.
+- **Permission is explicit.** The individual maintainer has given agents
+  permission to work on their behalf in this repository. Agents may create
+  branches, commit, run tests, and open pull requests; the maintainer reviews and
+  approves releases.
+- **Humans keep accountability.** The maintainer owns the product direction,
+  production credentials, legal/compliance decisions, and the final merge/deploy
+  decision. “Agent-maintained” does not mean unreviewed or unsupervised.
+- **Security is part of the workflow.** Agents are expected to use deny-by-default
+  Firestore rules, server-side payment verification, secret scanning, dependency
+  audits, and tests before proposing changes. The public repository never contains
+  private keys, service-account JSON, or provider secrets.
+- **The loop is visible.** The commit history, branches, review issues, CI runs,
+  and remediation checklist show the full cycle: audit → plan → implement →
+  verify → review → fix.
+
+Individual people and their own agents are welcome to contribute under the same
+review rules. See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+---
+
 ## What works
 
-- **Accounts** — email/password and Google sign-in, with protected routes and a
-  single shared auth context.
+- **Accounts** — email/password and Google sign-in, email verification, password
+  reset, protected routes, and in-app account deletion with recent sign-in.
 - **Listings** — create, browse, filter by city/type/maximum value, and view your
   own listings.
 - **Questions** — append-only public questions on each listing.
 - **Offers** — send an offer with a written trade proposal; see offers received
-  and offers placed under **My Bids**.
+  and offers placed under **My Bids**. Closed trades cannot be deleted.
 - **Negotiation** — private message threads, status changes (pending, in
-  negotiation, completed, declined), and withdrawal of an offer.
+  negotiation, completed, declined), and withdrawal of a pending offer.
 - **Ratings** — one 1–5 star rating per trader per completed trade, shown as an
   average on the profile.
 - **Crypto subscription checkout** — ZAR-priced Basic/Biz plans paid in USDT via
   a hosted checkout. NOWPayments is the first live adapter; a sandbox provider is
   available for local work. A Cloud Function verifies the payment and activates
-  the plan; the browser can never grant a plan.
+  the plan; the browser can never grant a plan. Late and duplicate webhooks are
+  handled idempotently, overpayments are flagged, and an hourly job reconciles
+  missed provider events.
 - **Security rules** — Firestore rules enforce ownership, participation and
-  append-only writes; see [firestore.rules](./umnotho/firestore.rules).
+  append-only writes, and restrict user profiles to their owner; see
+  [firestore.rules](./umnotho/firestore.rules).
 
 ### Deliberate demo limitations
 
@@ -274,14 +306,24 @@ See [SECURITY.md](./SECURITY.md) for the threat model and reporting process.
 - **Rules tests** start the Firestore emulator and exercise owner, participant,
   outsider, and payment access (`tests/rules/`).
 - **CI** runs lint, typecheck, unit tests, the production build, Cloud Functions
-  tests/build, and rules tests on every push and pull request.
-- **Deployment** runs on `main` when `FIREBASE_SERVICE_ACCOUNT` is configured;
-  otherwise the deploy step is skipped instead of failing the build. The default
+  tests/build, and rules tests on every push and pull request, plus a production
+  dependency audit, a gitleaks secret scan and dependency review.
+- **Security** is continuous: CodeQL static analysis and a weekly full-history
+  secret scan with SBOM generation run outside the per-push path.
+- **Deployment** runs only after CI passes on `main`, and only when
+  `FIREBASE_SERVICE_ACCOUNT` is configured; otherwise it exits with a notice
+  instead of failing the build. It deploys Firestore rules and indexes before
+  Hosting, and smoke tests the live site afterwards. The default
   `npm run deploy` / `firebase deploy` path deploys Hosting + Firestore and works
   on the free Spark plan. Cloud Functions require Blaze billing and deploy
   separately with `npm run deploy:functions`; the workflow does this only when
   the repository variable `CRYPTO_PROVIDER=nowpayments` is set and the
   NOWPayments credentials exist.
+- **Pull requests** get their own Firebase Hosting preview channel.
+
+Pipeline details, secrets inventory and branch protection live in
+[docs/devops.md](./docs/devops.md); incident and rollback procedures live in
+[docs/runbook.md](./docs/runbook.md).
 
 ---
 

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
-import { Calendar, Crown, Mail, Package, Star, UserRound } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { Calendar, Crown, Mail, Package, Star, Trash2, UserRound } from 'lucide-react';
 import AppNav from './AppNav';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../lib/firebase';
+import { db, functions } from '../lib/firebase';
 import { FullPageLoader } from './RouteGuards';
 
 interface ProfileData {
@@ -29,12 +30,14 @@ const PLAN_NAMES: Record<string, string> = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [listingCount, setListingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -88,6 +91,27 @@ export default function Profile() {
       count: values.length,
     };
   }, [profile?.ratings]);
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Delete your account? Your listings, bids and profile will be removed.')) {
+      return;
+    }
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await httpsCallable(functions, 'deleteMyAccount')();
+      await logout();
+      navigate('/');
+    } catch (deleteFailure) {
+      setDeleteError(
+        deleteFailure instanceof Error
+          ? deleteFailure.message
+          : 'Could not delete the account. Contact support.',
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -204,6 +228,28 @@ export default function Profile() {
                 Active listing{listingCount === 1 ? '' : 's'} in the exchange market
               </p>
             </div>
+          </section>
+
+          <section className="rounded-3xl border border-red-500/20 bg-red-500/5 p-8 md:col-span-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-display font-bold text-white">Delete account</p>
+                <p className="text-sm text-gray-400">
+                  Removes your profile and listings, and anonymises trade records. Payment records
+                  are kept for tax and fraud prevention.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 px-4 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-60"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? 'Deleting…' : 'Delete account'}
+              </button>
+            </div>
+            {deleteError && <p className="mt-3 text-sm text-red-300">{deleteError}</p>}
           </section>
         </div>
       </main>

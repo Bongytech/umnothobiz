@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  limit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -101,8 +102,16 @@ export default function MyBids() {
   useEffect(() => {
     if (!user) return;
 
-    const receivedQuery = query(collection(db, 'activeBids'), where('ownerId', '==', user.uid));
-    const placedQuery = query(collection(db, 'activeBids'), where('bidderId', '==', user.uid));
+    const receivedQuery = query(
+      collection(db, 'activeBids'),
+      where('ownerId', '==', user.uid),
+      limit(100),
+    );
+    const placedQuery = query(
+      collection(db, 'activeBids'),
+      where('bidderId', '==', user.uid),
+      limit(100),
+    );
 
     const sortByRecent = (bids: Bid[]) =>
       [...bids].sort(
@@ -241,7 +250,7 @@ export default function MyBids() {
         [`ratings.${user.uid}`]: ratingScore,
       });
       setRatingBid(null);
-      setNotice({ tone: 'success', text: 'Thanks â€” your rating has been saved.' });
+      setNotice({ tone: 'success', text: 'Thanks — your rating has been saved.' });
     } catch (error) {
       console.error('Could not save rating:', error);
       const code = (error as { code?: string } | null)?.code;
@@ -322,7 +331,7 @@ export default function MyBids() {
           <div className="flex gap-2 mb-4">
             <input
               type="text"
-              placeholder="Type a messageâ€¦"
+              placeholder="Type a message…"
               value={messages[bid.id] ?? ''}
               maxLength={1000}
               onChange={(event) =>
@@ -375,14 +384,26 @@ export default function MyBids() {
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleWithdraw(bid)}
-                disabled={busyBidId === bid.id}
-                className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-500/20 disabled:opacity-50"
-              >
-                Withdraw offer
-              </button>
+              <div className="flex w-full flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateStatus(bid, 'Declined')}
+                  disabled={busyBidId === bid.id}
+                  className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-500/20 disabled:opacity-50"
+                >
+                  Decline offer
+                </button>
+                {bid.status === 'Pending' && (
+                  <button
+                    type="button"
+                    onClick={() => handleWithdraw(bid)}
+                    disabled={busyBidId === bid.id}
+                    className="flex-1 py-2 bg-dark-800 hover:bg-dark-700 text-gray-300 text-sm font-medium rounded-lg transition-colors border border-white/10 disabled:opacity-50"
+                  >
+                    Withdraw offer
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -407,7 +428,7 @@ export default function MyBids() {
     return (
       <div className="min-h-screen bg-dark-950">
         <AppNav active="my-bids" />
-        <FullPageLoader label="Loading your offersâ€¦" />
+        <FullPageLoader label="Loading your offers…" />
       </div>
     );
   }
@@ -565,7 +586,7 @@ export default function MyBids() {
                   disabled={savingRating}
                   className="w-full py-3 bg-umnotho text-dark-950 font-semibold rounded-xl hover:bg-umnotho-hover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  <Check className="w-5 h-5" /> {savingRating ? 'Savingâ€¦' : 'Submit rating'}
+                  <Check className="w-5 h-5" /> {savingRating ? 'Saving…' : 'Submit rating'}
                 </button>
               </form>
             </motion.div>

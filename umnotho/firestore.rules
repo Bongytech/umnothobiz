@@ -43,7 +43,10 @@ service cloud.firestore {
 
     // ---------------------------------------------------------------- users
     match /users/{userId} {
-      allow read: if signedIn();
+      // Profile documents contain private contact data. Only the owner may
+      // read them; public display names are denormalised onto listings/bids.
+      allow get: if isSelf(userId);
+      allow list: if false;
 
       allow create: if isSelf(userId)
         && request.resource.data.keys().hasOnly(['displayName', 'email', 'ratings', 'createdAt'])
@@ -180,9 +183,10 @@ service cloud.firestore {
 
       allow update: if signedIn()
         && isBidParticipant()
-        && (isMessageAppend() || isOwnerStatusChange());
+        && (isMessageAppend() || isOwnerStatusChange() || isBidderDecline());
 
       allow delete: if signedIn()
+        && resource.data.status == 'Pending'
         && (resource.data.bidderId == request.auth.uid
           || resource.data.ownerId == request.auth.uid);
 
@@ -209,6 +213,15 @@ service cloud.firestore {
           && oldStatus != 'Completed'
           && oldStatus != 'Declined'
           && request.resource.data.status in ['In Negotiation', 'Completed', 'Declined']
+          && onlyChanged(['status', 'lastUpdated']);
+      }
+
+      // A bidder can end the negotiation without deleting the shared history.
+      function isBidderDecline() {
+        let oldStatus = resource.data.get('status', 'Pending');
+        return resource.data.bidderId == request.auth.uid
+          && oldStatus in ['Pending', 'In Negotiation']
+          && request.resource.data.status == 'Declined'
           && onlyChanged(['status', 'lastUpdated']);
       }
     }

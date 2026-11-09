@@ -14,8 +14,31 @@ export function isSandbox(): boolean {
   return providerName() === 'sandbox';
 }
 
+export function projectId(): string {
+  return process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? '';
+}
+
+/**
+ * Sandbox settlement is never allowed merely because an env var is set. It
+ * requires the emulator, or an explicitly allowlisted non-production project.
+ */
 export function sandboxAllowed(): boolean {
-  return isEmulator() || process.env.ALLOW_SANDBOX_PAYMENTS === 'true';
+  if (isEmulator()) return true;
+  if (process.env.ALLOW_SANDBOX_PAYMENTS !== 'true') return false;
+
+  const project = projectId();
+  const allowlist = (process.env.SANDBOX_PROJECT_ALLOWLIST ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const allowed = project.startsWith('demo-') || allowlist.includes(project);
+  if (!allowed) {
+    console.error(
+      'ALLOW_SANDBOX_PAYMENTS=true is set on a production project, but sandbox is not allowlisted. Refusing sandbox settlement.',
+    );
+  }
+  return allowed;
 }
 
 /**
@@ -41,6 +64,11 @@ export function getProvider(): PaymentProvider {
   }
 
   if (name === 'nowpayments') {
+    if (!isEmulator() && process.env.USE_SECRET_MANAGER !== 'true') {
+      throw new Error(
+        'Production NOWPayments requires Secret Manager. Set USE_SECRET_MANAGER=true and bind the API key/IPN secret.',
+      );
+    }
     return new NowPaymentsProvider();
   }
 

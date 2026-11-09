@@ -52,11 +52,17 @@ export default function Auth() {
     try {
       if (isLogin) {
         await login(email.trim(), password);
+        navigate(from, { replace: true });
       } else {
         await signUp(email.trim(), password, username.trim());
-        setNotice('Account created. Check your inbox to verify your email before paying.');
+        // PublicOnlyRoute redirects as soon as auth state changes, so the
+        // notice is carried in sessionStorage and shown on the market page.
+        sessionStorage.setItem(
+          'umnotho.notice',
+          'Account created. Check your inbox to verify your email before paying.',
+        );
+        navigate('/barter', { replace: true });
       }
-      navigate(from, { replace: true });
     } catch (authError) {
       console.error('Authentication error', authError);
       setError(authErrorMessage(authError));
